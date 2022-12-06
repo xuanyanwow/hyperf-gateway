@@ -1,0 +1,25 @@
+{
+    "name": "friendsofhyperf/gateway",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Friendsofhyperf\\Gateway\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "siam"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "hyperf/command": "~3.0.0",
+        "swoole/ide-helper": "^5.0",
+      "ext-sockets": "*"
+    },
+    "extra": {
+        "hyperf": {
+            "config": "friendsofhyperf\\gateway\\ConfigProvider"
+        }
+    }
+}
