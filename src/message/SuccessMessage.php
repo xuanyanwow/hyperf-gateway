@@ -4,7 +4,9 @@ namespace Friendsofhyperf\Gateway\message;
 
 class SuccessMessage extends BaseMessage
 {
-    public string $class = self::class;
+    const CMD = 'SuccessMessage';
+
+    public string $class = self::CMD;
     public string $message;
 
     public function __construct($message)

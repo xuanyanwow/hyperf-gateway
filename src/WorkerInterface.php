@@ -8,9 +8,9 @@ interface WorkerInterface
 
     public function onStart();
 
-    public function onConnect($clientId);
+    public function onConnect($fd);
 
-    public function onMessage($clientId, $revData);
+    public function onMessage($fd, $revData);
 
-    public function onClose($conn);
+    public function onClose($fd);
 }

@@ -4,71 +4,64 @@ namespace Friendsofhyperf\Gateway;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\worker\TcpServerTrait;
 use Swoole\Coroutine;
-use Swoole\Coroutine\Server\Connection;
-use Swoole\Process;
 
 class GatewayWorker implements WorkerInterface
 {
-    use TcpServerTrait;
 
     public function onStart(): void
     {
         echo "\n====================\ngateway start \n====================\n\n";
 
-        // 读取配置文件，监听端口
         // 上报register
-        go(function (){
-            $this->connectRegister();
-        });
-
-        $server = new \Swoole\Coroutine\Server('127.0.0.1', 9501, false, true);
-
-        Process::signal(SIGTERM, function () use ($server) {
-            $server->shutdown();
-        });
-
-        $server->handle(function (Connection $conn) {
-            $this->tcpServerHandle($conn);
-        });
-
-        //开始监听端口
-        $server->start();
+        $this->connectRegister();
     }
 
-    public function onConnect( $clientId): void
+    public function onConnect($fd): void
     {
         echo "gateway worker connect\n";
         // 转发给business
     }
 
-    public function onMessage( $clientId,  $revData): void
+    public function onMessage($fd, $revData)
     {
         echo "gateway worker message\n";
         // 转发到business
     }
 
-    public function onClose($conn): void
+    public function onClose($fd): void
     {
         echo "gateway worker close\n";
     }
 
     public function start($daemon = false)
     {
-        $process = new Process(function(){
-            (new GatewayWorker)->onStart();
-        });
-        $process->set([
-            'enable_coroutine' => true
-        ]);
-        if ($daemon){
-            $process->daemon();
-        }
-        $process->start();
-        $process->name('hyperf:gateway');
+        // 读取配置文件，监听端口
 
-        if (!$daemon){
-            $process->wait();
-        }
+        $server = new \Swoole\Server('0.0.0.0', 9501, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $server->set([
+            'worker_num' => 1,
+            'daemonize' => $daemon,
+            'enable_coroutine' => true,
+        ]);
+
+        $server->on('WorkerStart', function(\Swoole\Server $server, int $workerId) {
+            go(function(){
+                $this->onStart();
+            });
+        });
+        $server->on('connect', function ($server, $fd){
+            $this->onConnect($fd);
+        });
+        $server->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
+            $response = $this->onMessage($fd,$data);
+            if (!empty($response)){
+                $server->send($fd, $response);
+            }
+        });
+        $server->on('close', function ($server, $fd) {
+            $this->onClose($fd);
+        });
+        $server->start();
     }
 
     private function connectRegister()
@@ -83,8 +76,7 @@ class GatewayWorker implements WorkerInterface
         // $client->close();
         while(1){
             // echo $client->recv();
-            Coroutine::sleep(0.01);
-            var_dump($client);
+            Coroutine::sleep(3);
         }
     }
 }

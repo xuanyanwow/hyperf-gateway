@@ -6,7 +6,9 @@ use Friendsofhyperf\Gateway\message\BaseMessage;
 
 class ConnectMessage extends BaseMessage
 {
-    public string $class = self::class;
+    const CMD = 'ConnectMessage';
+
+    public string $class = self::CMD;
     public string $ip;
     public string $type;
 
