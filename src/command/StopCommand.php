@@ -27,6 +27,7 @@ class StopCommand extends HyperfCommand
 
     public function handle()
     {
+        // TODO 启动后生成pid文件 用于kill
         Process::kill(13443);
     }
 
