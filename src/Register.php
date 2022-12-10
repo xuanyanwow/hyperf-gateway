@@ -56,17 +56,21 @@ class Register implements WorkerInterface
         // gateway删除 通知所有business
         var_dump('register 中有人断开' . $fd);
 
-        if (!empty($this->gateways[$fd])){ unset($this->gateways[$fd]); };
+        if (!empty($this->gateways[$fd])){
+            unset($this->gateways[$fd]);
+            // 通知所有的worker
+        }
     }
 
     public function start($daemon = false)
     {
 
-        $server = new \Swoole\Server('0.0.0.0', 1236, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $server = new \Swoole\Server('0.0.0.0', \registerPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
         $server->set([
             'worker_num' => 1,
             'daemonize' => $daemon,
             'enable_coroutine' => true,
+            'hook_flags' => swoole_hook_flags(),
         ]);
 
         $server->on('WorkerStart', function(\Swoole\Server $server, int $workerId) {

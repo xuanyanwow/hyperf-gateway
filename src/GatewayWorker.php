@@ -1,37 +1,34 @@
 <?php
 namespace Friendsofhyperf\Gateway;
 
-use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
+use Friendsofhyperf\Gateway\event\GatewayWorkerInnerTCP;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
-use Swoole\Coroutine;
+use Friendsofhyperf\Gateway\worker\LogTrait;
+use Hyperf\Engine\Coroutine;
 use Swoole\Coroutine\Client;
+use Swoole\Server;
+use Swoole\Timer;
 
 class GatewayWorker implements WorkerInterface
 {
     use ConnectRegisterTrait;
+    use LogTrait;
 
     private static Client $registerClient;
 
     protected static array $businesses = [];
 
-    private \Swoole\Server $server;
+    private Server $server;
 
-    private false|\Swoole\Server\Port $_innerTcpWorker;
+    private GatewayWorkerInnerTCP $_innerTcp;
+
 
     public function onStart(): void
     {
         echo "\n====================\ngateway start \n====================\n\n";
-
-        // TODO 开启内部监听，用于监听 worker 的连接已经连接上发来的数据
-        $this->_innerTcpWorker = $this->server->listen("0.0.0.0", "lanPort", SWOOLE_SOCK_TCP);
-        $this->_innerTcpWorker->set([]);
-        $this->_innerTcpWorker->on('connect', [$this, 'onWorkerConnect']);
-        $this->_innerTcpWorker->on('receive', [$this, 'onWorkerConnect']);
-        $this->_innerTcpWorker->on('close', [$this, 'onWorkerConnect']);
-
 
         // 上报register
         $this->connectRegister();
@@ -66,33 +63,18 @@ class GatewayWorker implements WorkerInterface
         // $this->sendToWorker(C::CMD_ON_CONNECT, $connection);
     }
 
-    public function onMessage($fd, $revData)
+    public function onMessage($fd, $revData): mixed
     {
         echo "gateway worker message\n";
         // 全量转发到business即可
         // $this->sendToBusiness();
-
-        // TODO 下面应该是onWorkerMessage里的
-        var_dump($revData);
-        $revData = json_decode($revData, true);
-        if (empty($revData) && empty($revData['class'])) return false;
-
-        switch ($revData['class']) {
-            case BusinessConnectMessage::CMD:
-                self::$businesses[$fd] = $fd;
-                return new SuccessMessage("business connected");
-
-            default :
-                break;
-        }
 
         return false;
     }
 
     public function onClose($fd): void
     {
-        var_dump('有人从gateway断开了');
-        if (isset(self::$businesses[$fd])) unset(self::$businesses[$fd]);
+        var_dump('有client从gateway断开了');
 
         // TODO
         // 清理 uid 数据
@@ -104,17 +86,16 @@ class GatewayWorker implements WorkerInterface
     {
         // 读取配置文件，监听端口
 
-        $this->server = $server = new \Swoole\Server('0.0.0.0', 9501, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $this->server = $server = new Server('0.0.0.0', 9501, SWOOLE_PROCESS, SWOOLE_SOCK_TCP);
         $server->set([
-            'worker_num' => 1,
+            'worker_num' => 2,
             'daemonize' => $daemon,
             'enable_coroutine' => true,
+            'hook_flags' => swoole_hook_flags(),
         ]);
 
         $server->on('WorkerStart', function(\Swoole\Server $server, int $workerId) {
-            go(function(){
-                $this->onStart();
-            });
+            $this->onStart();
         });
         $server->on('connect', function ($server, $fd){
             $this->onConnect($fd);
@@ -128,15 +109,19 @@ class GatewayWorker implements WorkerInterface
         $server->on('close', function ($server, $fd) {
             $this->onClose($fd);
         });
+
+        // 开启内部监听，用于监听 worker 的连接已经连接上发来的数据
+        $this->_innerTcp = new GatewayWorkerInnerTCP($this);
+
         $server->start();
     }
 
-    protected function onRegisterConnect($client)
+    protected function onRegisterConnect(Client $client)
     {
-        $client->send(new ConnectMessage('127.0.0.1:9501', ConnectMessage::TYPE_GATEWAY));
+        $client->send(new ConnectMessage(\lanIP.":".\lanPort, ConnectMessage::TYPE_GATEWAY));
     }
 
-    protected function onRegisterReceive($client, $data)
+    protected function onRegisterReceive($client, $data): bool
     {
         if ($data['class'] ?? '' == SuccessMessage::CMD){
             self::$registerClient = $client;
@@ -153,15 +138,27 @@ class GatewayWorker implements WorkerInterface
      */
     private function heartClient()
     {
-        go(function(){
-            while (true) {
-                var_dump("维持business心跳和客户端心跳");
-                foreach (self::$businesses as $fd) {
-                    $this->server->send($fd, new PingMessage());
-                }
-                Coroutine::sleep(3);
+        Timer::tick(3000, function(){
+            self::info("gateway", "heart", "数量". count(self::$businesses));
+            foreach (self::$businesses as $fd) {
+                $this->server->send($fd, new PingMessage());
             }
         });
 
+    }
+
+    public function getServer(): Server
+    {
+        return $this->server;
+    }
+
+    public function addBusiness($fd, $business)
+    {
+        self::$businesses[$fd] = $business;
+    }
+
+    public function delBusiness($fd)
+    {
+        if (isset(self::$businesses[$fd])) unset(self::$businesses[$fd]);
     }
 }

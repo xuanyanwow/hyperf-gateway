@@ -17,12 +17,12 @@ class StopCommand extends HyperfCommand
     /**
      * Execution in a coroutine environment.
      */
-    protected bool $coroutine = false;
+    protected $coroutine = false;
 
     /**
      * 执行的命令行
      */
-    protected ?string $name = 'gateway:stop';
+    protected  $name = 'gateway:stop';
 
 
     public function handle()

@@ -2,6 +2,9 @@
     "name": "friendsofhyperf/gateway",
     "type": "library",
     "autoload": {
+        "files": [
+            "config.php"
+        ],
         "psr-4": {
             "Friendsofhyperf\\Gateway\\": "src/"
         }
@@ -13,8 +16,8 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "hyperf/command": "~3.0.0",
-        "swoole/ide-helper": "^5.0",
+        "hyperf/command": "~2.2.0",
+        "swoole/ide-helper": "^4.5",
       "ext-sockets": "*"
     },
     "extra": {

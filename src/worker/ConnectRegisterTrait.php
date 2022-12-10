@@ -33,7 +33,7 @@ trait ConnectRegisterTrait
     {
         $client = new Client(SWOOLE_SOCK_TCP);
 
-        if (!$client->connect('0.0.0.0', 1236, 3)) {
+        if (!$client->connect(\registerIp, \registerPort, 3)) {
             echo "connect failed. Error: {$client->errCode}\n";
             return;
         }
