@@ -11,23 +11,16 @@ namespace Friendsofhyperf\Gateway\message\register;
 
 use Friendsofhyperf\Gateway\message\BaseMessage;
 
-class ConnectMessage extends BaseMessage
+class GatewayDisconnectMessage extends BaseMessage
 {
-    public const CMD = 'ConnectMessage';
-
-    public const TYPE_GATEWAY = 'gateway';
-
-    public const TYPE_BUSINESS = 'business';
+    public const CMD = 'GatewayDisconnectMessage';
 
     public string $class = self::CMD;
 
-    public string $ip;
+    public array $list = [];
 
-    public string $type;
-
-    public function __construct(string $ip, string $type)
+    public function __construct($list)
     {
-        $this->ip = $ip;
-        $this->type = $type;
+        $this->list = $list;
     }
 }

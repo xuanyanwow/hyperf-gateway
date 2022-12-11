@@ -1,58 +1,66 @@
 <?php
 
+declare(strict_types=1);
+/**
+ * This file is part of friendsofhyperf/components.
+ * @link     https://github.com/friendsofhyperf/components
+ * @document https://github.com/friendsofhyperf/components/blob/3.x/README.md
+ * @contact  huangdijia@gmail.com
+ */
 namespace Friendsofhyperf\Gateway\worker;
 
 use Friendsofhyperf\Gateway\message\PingMessage;
-use Friendsofhyperf\Gateway\message\register\ConnectMessage;
-use Friendsofhyperf\Gateway\message\register\GatewayInfoMessage;
-use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Client;
-use Swoole\Timer;
+
+use const registerIp;
+use const registerPort;
 
 trait ConnectRegisterTrait
 {
-    /**
-     * 维持与register的连接, 实现自动重连
-     * TODO
-     *
-     * @param $client
-     * @return void
-     */
-    private function heartRegister()
-    {
-        go(function(){
-            while(true) {
-                self::$registerClient->send(new PingMessage());
-                Coroutine::sleep(5);
-            }
-        });
-    }
-
     protected function connectRegister()
     {
         $client = new Client(SWOOLE_SOCK_TCP);
 
-        if (!$client->connect(\registerIp, \registerPort, 3)) {
+        if (! $client->connect(registerIp, registerPort, 3)) {
             echo "connect failed. Error: {$client->errCode}\n";
             return;
         }
 
         $this->onRegisterConnect($client);
+        $this->heartRegister();
 
-        while(true){
-            $data = $client->recv();
+        \Hyperf\Engine\Coroutine::create(function () use ($client) {
+            while (true) {
+                $data = $client->recv();
 
-            if (!empty($data)){
-                $data = json_decode($data, true);
-                $breakWait = $this->onRegisterReceive($client, $data);
-                if ($breakWait) {
-                    $this->heartRegister();
-                    break;
+                if (! empty($data)) {
+                    $data = json_decode($data, true);
+                    $this->onRegisterReceive($client, $data);
                 }
-            }
 
-            Coroutine::sleep(3);
-        }
+                Coroutine::sleep(0.01);
+            }
+        });
+    }
+
+    /**
+     * 维持与register的连接, 实现自动重连
+     * TODO.
+     *
+     * @param $client
+     */
+    private function heartRegister()
+    {
+        go(function () {
+            while (true) {
+                if (empty(self::$registerClient)) {
+                    Coroutine::sleep(5);
+                    continue;
+                }
+                self::$registerClient->send(new PingMessage());
+                Coroutine::sleep(5);
+            }
+        });
     }
 }

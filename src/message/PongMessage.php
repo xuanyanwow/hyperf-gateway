@@ -1,9 +1,17 @@
 <?php
 
+declare(strict_types=1);
+/**
+ * This file is part of friendsofhyperf/components.
+ * @link     https://github.com/friendsofhyperf/components
+ * @document https://github.com/friendsofhyperf/components/blob/3.x/README.md
+ * @contact  huangdijia@gmail.com
+ */
 namespace Friendsofhyperf\Gateway\message;
 
 class PongMessage extends BaseMessage
 {
-    const CMD = 'PongMessage';
+    public const CMD = 'PongMessage';
+
     public string $class = self::CMD;
 }

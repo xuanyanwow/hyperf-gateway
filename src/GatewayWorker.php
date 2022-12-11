@@ -1,4 +1,12 @@
 <?php
+
+declare(strict_types=1);
+/**
+ * This file is part of friendsofhyperf/components.
+ * @link     https://github.com/friendsofhyperf/components
+ * @document https://github.com/friendsofhyperf/components/blob/3.x/README.md
+ * @contact  huangdijia@gmail.com
+ */
 namespace Friendsofhyperf\Gateway;
 
 use Friendsofhyperf\Gateway\event\GatewayWorkerInnerTCP;
@@ -7,24 +15,25 @@ use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
 use Friendsofhyperf\Gateway\worker\LogTrait;
-use Hyperf\Engine\Coroutine;
 use Swoole\Coroutine\Client;
 use Swoole\Server;
 use Swoole\Timer;
+
+use const lanIP;
+use const lanPort;
 
 class GatewayWorker implements WorkerInterface
 {
     use ConnectRegisterTrait;
     use LogTrait;
 
-    private static Client $registerClient;
-
     protected static array $businesses = [];
+
+    private static Client $registerClient;
 
     private Server $server;
 
     private GatewayWorkerInnerTCP $_innerTcp;
-
 
     public function onStart(): void
     {
@@ -94,19 +103,19 @@ class GatewayWorker implements WorkerInterface
             'hook_flags' => swoole_hook_flags(),
         ]);
 
-        $server->on('WorkerStart', function(\Swoole\Server $server, int $workerId) {
+        $server->on('WorkerStart', function (Server $server, int $workerId) {
             // swoole进程模型与workerman不一样
             // swoole woker_num设置后，多个进程监听同一个端口，自动分配链接到多个进程上，所以只需要上报register一次就好了
-            if ($workerId == 0){
+            if ($workerId == 0) {
                 $this->onStart();
             }
         });
-        $server->on('connect', function ($server, $fd){
+        $server->on('connect', function ($server, $fd) {
             $this->onConnect($fd);
         });
-        $server->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
-            $response = $this->onMessage($fd,$data);
-            if (!empty($response)){
+        $server->on('receive', function (Server $server, $fd, $reactor_id, $data) {
+            $response = $this->onMessage($fd, $data);
+            if (! empty($response)) {
                 $server->send($fd, $response);
             }
         });
@@ -118,38 +127,6 @@ class GatewayWorker implements WorkerInterface
         $this->_innerTcp = new GatewayWorkerInnerTCP($this);
 
         $server->start();
-    }
-
-    protected function onRegisterConnect(Client $client)
-    {
-        self::info("Gateway","onRegisterConnect", '上报gateway地址');
-        $client->send(new ConnectMessage(\lanIP.":".\lanPort, ConnectMessage::TYPE_GATEWAY));
-    }
-
-    protected function onRegisterReceive($client, $data): bool
-    {
-        if ($data['class'] ?? '' == SuccessMessage::CMD){
-            self::$registerClient = $client;
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * 维持business心跳和客户端心跳
-     *
-     * @return void
-     */
-    private function heartClient()
-    {
-        Timer::tick(3000, function(){
-            self::info("gateway", "heart", "数量". count(self::$businesses));
-            foreach (self::$businesses as $fd) {
-                $this->server->send($fd, new PingMessage());
-            }
-        });
-
     }
 
     public function getServer(): Server
@@ -164,6 +141,35 @@ class GatewayWorker implements WorkerInterface
 
     public function delBusiness($fd)
     {
-        if (isset(self::$businesses[$fd])) unset(self::$businesses[$fd]);
+        if (isset(self::$businesses[$fd])) {
+            unset(self::$businesses[$fd]);
+        }
+    }
+
+    protected function onRegisterConnect(Client $client)
+    {
+        self::debug('Gateway', 'onRegisterConnect', '上报gateway地址');
+        $client->send(new ConnectMessage(lanIP . ':' . lanPort, ConnectMessage::TYPE_GATEWAY));
+    }
+
+    protected function onRegisterReceive($client, $data)
+    {
+        if ($data['class'] ?? '' == SuccessMessage::CMD) {
+            self::$registerClient = $client;
+            return;
+        }
+    }
+
+    /**
+     * 维持business心跳和客户端心跳.
+     */
+    private function heartClient()
+    {
+        Timer::tick(3000, function () {
+            self::debug('gateway', 'heart', '数量' . count(self::$businesses));
+            foreach (self::$businesses as $fd) {
+                $this->server->send($fd, new PingMessage());
+            }
+        });
     }
 }

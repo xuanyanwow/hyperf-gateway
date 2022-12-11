@@ -1,32 +1,34 @@
 <?php
 
+declare(strict_types=1);
+/**
+ * This file is part of friendsofhyperf/components.
+ * @link     https://github.com/friendsofhyperf/components
+ * @document https://github.com/friendsofhyperf/components/blob/3.x/README.md
+ * @contact  huangdijia@gmail.com
+ */
 namespace Friendsofhyperf\Gateway\command;
-
 
 use Friendsofhyperf\Gateway\BusinessWorker;
 use Friendsofhyperf\Gateway\GatewayWorker;
 use Friendsofhyperf\Gateway\Register;
-use Hyperf\Command\Command as HyperfCommand;
 use Hyperf\Command\Annotation\Command;
-use Symfony\Component\Console\Input\InputArgument;
-use Swoole\Process;
+use Hyperf\Command\Command as HyperfCommand;
 use Swoole\Coroutine;
-use Swoole\Coroutine\Server\Connection;
+use Symfony\Component\Console\Input\InputArgument;
 
 #[Command]
 class StartCommand extends HyperfCommand
 {
-
     /**
      * Execution in a coroutine environment.
      */
     protected $coroutine = false;
 
     /**
-     * 执行的命令行
+     * 执行的命令行.
      */
     protected $name = 'gateway:start';
-
 
     public function handle()
     {
@@ -34,13 +36,13 @@ class StartCommand extends HyperfCommand
         $type = $this->input->getArgument('type');
 
         // 是否后台运行
-        $daemon =(bool)  $this->input->getArgument('d') ?? false;
+        $daemon = (bool) $this->input->getArgument('d') ?? false;
 
         match ($type) {
             'register' => (new Register())->start($daemon),
             'gateway' => (new GatewayWorker())->start($daemon),
             'business' => (new BusinessWorker())->start($daemon),
-            default => $this->line("type error", 'error'),
+            default => $this->line('type error', 'error'),
         };
     }
 
@@ -51,5 +53,4 @@ class StartCommand extends HyperfCommand
             ['d', InputArgument::OPTIONAL, '是否后台运行'],
         ];
     }
-
 }
