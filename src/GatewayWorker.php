@@ -29,18 +29,21 @@ class GatewayWorker implements WorkerInterface
 
     protected static array $businesses = [];
 
-    private static Client $registerClient;
-
     private Server $server;
 
     private GatewayWorkerInnerTCP $_innerTcp;
+
+    private int $workerId;
 
     public function onStart(): void
     {
         echo "\n====================\ngateway start \n====================\n\n";
 
         // 上报register
-        $this->connectRegister();
+        // swoole woker_num设置后，多个进程监听同一个端口，自动分配链接到多个进程上，所以只需要上报register一次就好了
+        if ($this->workerId == 0){
+            $this->connectRegister();
+        }
 
         // 维持business心跳和客户端心跳
         $this->heartClient();
@@ -105,10 +108,8 @@ class GatewayWorker implements WorkerInterface
 
         $server->on('WorkerStart', function (Server $server, int $workerId) {
             // swoole进程模型与workerman不一样
-            // swoole woker_num设置后，多个进程监听同一个端口，自动分配链接到多个进程上，所以只需要上报register一次就好了
-            if ($workerId == 0) {
-                $this->onStart();
-            }
+            $this->workerId = $workerId;
+            $this->onStart();
         });
         $server->on('connect', function ($server, $fd) {
             $this->onConnect($fd);
@@ -149,15 +150,12 @@ class GatewayWorker implements WorkerInterface
     protected function onRegisterConnect(Client $client)
     {
         self::debug('Gateway', 'onRegisterConnect', '上报gateway地址');
-        $client->send(new ConnectMessage(lanIP . ':' . lanPort, ConnectMessage::TYPE_GATEWAY));
+        $client->send(ConnectMessage::make(lanIP . ':' . lanPort, ConnectMessage::TYPE_GATEWAY));
     }
 
     protected function onRegisterReceive($client, $data)
     {
-        if ($data['class'] ?? '' == SuccessMessage::CMD) {
-            self::$registerClient = $client;
-            return;
-        }
+
     }
 
     /**
@@ -168,7 +166,7 @@ class GatewayWorker implements WorkerInterface
         Timer::tick(3000, function () {
             self::debug('gateway', 'heart', '数量' . count(self::$businesses));
             foreach (self::$businesses as $fd) {
-                $this->server->send($fd, new PingMessage());
+                $this->server->send($fd, PingMessage::make());
             }
         });
     }

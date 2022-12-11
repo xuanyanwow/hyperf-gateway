@@ -32,7 +32,7 @@ class GatewayWorkerInnerTCP
     {
         self::debug('GatewayWorkerInnerTCP', 'start', '设置内部监听端口' . lanIP . ':' . lanPort);
 
-        $this->_innerTcpWorker = $gatewayWorker->getServer()->listen(lanIP, lanPort, SWOOLE_SOCK_TCP);
+        $this->_innerTcpWorker = $gatewayWorker->getServer()->listen(lanIP, (int) lanPort, SWOOLE_SOCK_TCP);
         $this->_innerTcpWorker->set([
             'enable_coroutine' => true,
             'hook_flags' => swoole_hook_flags(),
@@ -71,7 +71,7 @@ class GatewayWorkerInnerTCP
         switch ($revData['class']) {
             case BusinessConnectMessage::CMD:
                 $this->gatewayWorker->addBusiness($fd, $fd);
-                $server->send($fd, new SuccessMessage('business connected'));
+                $server->send($fd, SuccessMessage::make('business connected'));
 
                 // no break
             default:

@@ -15,10 +15,7 @@ class SuccessMessage extends BaseMessage
 
     public string $class = self::CMD;
 
-    public string $message;
-
-    public function __construct($message)
+    public function __construct(public string $message)
     {
-        $this->message = $message;
     }
 }

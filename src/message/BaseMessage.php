@@ -15,4 +15,9 @@ class BaseMessage
     {
         return json_encode($this) . "\n";
     }
+
+    public static function make(...$args): string
+    {
+        return (string) (new static(...$args)) ;
+    }
 }

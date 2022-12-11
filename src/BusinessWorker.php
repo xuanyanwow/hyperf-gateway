@@ -10,12 +10,14 @@ declare(strict_types=1);
 namespace Friendsofhyperf\Gateway;
 
 use Friendsofhyperf\Gateway\event\BusinessWorkerOnRegisterReceive;
+use Friendsofhyperf\Gateway\event\BusinessWorkerOnGatewayReceive;
 use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
 use Friendsofhyperf\Gateway\worker\LogTrait;
+use Swoole\Coroutine;
 use Swoole\Coroutine\Client;
 
 class BusinessWorker implements WorkerInterface
@@ -23,10 +25,9 @@ class BusinessWorker implements WorkerInterface
     use ConnectRegisterTrait;
     use LogTrait;
     use BusinessWorkerOnRegisterReceive;
+    use BusinessWorkerOnGatewayReceive;
 
     protected static array $gateways = [];
-
-    protected static Client $registerClient;
 
     public function onStart(): void
     {
@@ -62,11 +63,12 @@ class BusinessWorker implements WorkerInterface
 
     protected function onRegisterConnect($client)
     {
-        $client->send(new ConnectMessage('business的ip', ConnectMessage::TYPE_BUSINESS));
+        $client->send( ConnectMessage::make('business的ip', ConnectMessage::TYPE_BUSINESS));
     }
 
     protected function onRegisterReceive($client, $data)
     {
+        self::debug("business", "onRegisterReceive", $data);
         $this->businessWorkerOnRegisterReceive($client, $data);
     }
 
@@ -76,8 +78,9 @@ class BusinessWorker implements WorkerInterface
             if (isset(self::$gateways[$address])) {
                 continue;
             }
+            self::debug("Business", "有新的gateway", self::$gateways);
+            self::debug("Business", "有新的gateway", $address);
             // 需要开协程去连接，在协程里wait任务 不然会造成堵塞问题
-            // 这里需要记录协程ID，如果同一个IP 反复重连，创建新的之前应该把旧的协程停掉
             \Hyperf\Engine\Coroutine::create(function () use ($address) {
                 $client = new Client(SWOOLE_SOCK_TCP);
 
@@ -85,7 +88,7 @@ class BusinessWorker implements WorkerInterface
 
                 $isConnected = false;
                 while (! $isConnected) {
-                    if (! $client->connect($addressMap[0], $addressMap[1], 3)) {
+                    if (! $client->connect($addressMap[0], (int)$addressMap[1], 3)) {
                         self::debug('Business', 'connect Gateway Error', $client->errCode);
                         $client->close();
                         \Hyperf\Utils\Coroutine::sleep(3);
@@ -97,7 +100,7 @@ class BusinessWorker implements WorkerInterface
                 self::debug('Business', 'connect Gateway Success', '');
 
                 // send "I am a business worker and wait receive message from gateway"
-                $client->send(new BusinessConnectMessage('测试worker ip', 'ok'));
+                $client->send(BusinessConnectMessage::make('测试worker ip', 'ok'));
                 $data = $client->recv(10);
                 if (! empty($data)) {
                     $data = json_decode($data, true);
@@ -127,20 +130,13 @@ class BusinessWorker implements WorkerInterface
             // register监听到gateway掉线后，会通知给business  删除列表
             if (empty(self::$gateways[$address])) {
                 self::debug('Business', 'wait Gateway Job', '检测到gateway已经下线了' . $address);
-                break;
+                return;
             }
 
             if (! empty($data)) {
                 $data = json_decode($data, true);
                 if (! empty($data)) {
-                    if ($data['class'] == PingMessage::CMD) {
-                        self::debug('BusinessWorker', 'waitGateway', '收到gateway发来的心跳');
-                        continue;
-                    }
-                    // 每一条任务消息都开协程处理
-                    \Hyperf\Engine\Coroutine::create(function () use ($client, $data) {
-                        $this->onMessage($client->exportSocket()->fd, $data);
-                    });
+                    $this->businessWorkerOnGatewayReceive($client, $data);
                 }
             }
             \Hyperf\Utils\Coroutine::sleep(0.01);

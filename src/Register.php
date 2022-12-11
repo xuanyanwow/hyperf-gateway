@@ -58,12 +58,12 @@ class Register implements WorkerInterface
             case ConnectMessage::CMD:
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
                     $this->gateways[$revData['ip']] = $fd;
-                    $this->sendAllBusiness(new GatewayConnectMessage([$revData['ip']]));
-                    return new SuccessMessage('register connected');
+                    $this->sendAllBusiness(GatewayConnectMessage::make([$revData['ip']]));
+                    return SuccessMessage::make('register connected');
                 }
                 if ($revData['type'] === ConnectMessage::TYPE_BUSINESS) {
                     $this->business[$fd] = $fd;
-                    return new GatewayInfoMessage(array_keys($this->gateways));
+                    return GatewayInfoMessage::make(array_keys($this->gateways));
                 }
                 break;
             default:
@@ -87,14 +87,14 @@ class Register implements WorkerInterface
             if ($gatewayFd == $fd) {
                 self::debug('Register', 'onClose', 'gateway close ' . $ip);
                 unset($this->gateways[$ip]);
-                $this->sendAllBusiness(new GatewayDisconnectMessage([$ip]));
+                $this->sendAllBusiness(GatewayDisconnectMessage::make([$ip]));
             }
         }
     }
 
     public function start($daemon = false)
     {
-        $this->server = $server = new Server('0.0.0.0', registerPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $this->server = $server = new Server(registerIp, (int) registerPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
         $server->set([
             'worker_num' => 1,
             'daemonize' => $daemon,
@@ -123,6 +123,7 @@ class Register implements WorkerInterface
     protected function sendAllBusiness($message)
     {
         self::debug('register', 'send all business', $message);
+        self::debug('register', 'send all business', $this->business);
         foreach ($this->business as $fd) {
             $this->server->send($fd, $message);
         }

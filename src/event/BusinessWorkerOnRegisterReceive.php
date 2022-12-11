@@ -16,8 +16,6 @@ use Swoole\Coroutine\Client;
 
 trait BusinessWorkerOnRegisterReceive
 {
-    protected static Client $registerClient;
-
     public function businessWorkerOnRegisterReceive($client, $data)
     {
         self::debug('Business', 'register Receive', $data);
@@ -51,7 +49,6 @@ trait BusinessWorkerOnRegisterReceive
      */
     protected function gatewayInfoList($client, $data)
     {
-        self::$registerClient = $client;
         $this->connectGateway($data['list'] ?? []);
     }
 
