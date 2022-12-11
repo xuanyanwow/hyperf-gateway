@@ -95,7 +95,11 @@ class GatewayWorker implements WorkerInterface
         ]);
 
         $server->on('WorkerStart', function(\Swoole\Server $server, int $workerId) {
-            $this->onStart();
+            // swoole进程模型与workerman不一样
+            // swoole woker_num设置后，多个进程监听同一个端口，自动分配链接到多个进程上，所以只需要上报register一次就好了
+            if ($workerId == 0){
+                $this->onStart();
+            }
         });
         $server->on('connect', function ($server, $fd){
             $this->onConnect($fd);
@@ -118,6 +122,7 @@ class GatewayWorker implements WorkerInterface
 
     protected function onRegisterConnect(Client $client)
     {
+        self::info("Gateway","onRegisterConnect", '上报gateway地址');
         $client->send(new ConnectMessage(\lanIP.":".\lanPort, ConnectMessage::TYPE_GATEWAY));
     }
 
