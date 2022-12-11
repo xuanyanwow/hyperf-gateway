@@ -99,20 +99,23 @@ class BusinessWorker implements WorkerInterface
 
                 self::debug('Business', 'connect Gateway Success', '');
 
+                handsGateway:
                 // send "I am a business worker and wait receive message from gateway"
                 $client->send(BusinessConnectMessage::make('测试worker ip', 'ok'));
                 $data = $client->recv(10);
-                if (! empty($data)) {
-                    $data = json_decode($data, true);
-                    if ($data['class'] != SuccessMessage::CMD) {
-                        return;
-                    }
 
-                    self::$gateways[$address] = $client;
-                    $this->waitGateway($client, $address);
-                } else {
+
+                $data = json_decode($data, true);
+                if (empty($data) || $data['class'] != SuccessMessage::CMD){
                     self::debug('Business', 'connectGateway', '等待鉴权握手 响应超时');
+                    goto handsGateway;
                 }
+
+
+                self::$gateways[$address] = $client;
+                // 开始监听gateway的任务
+                $this->waitGateway($client, $address);
+
             });
         }
     }
@@ -124,7 +127,10 @@ class BusinessWorker implements WorkerInterface
     private function waitGateway(Client $client, $address)
     {
         while (true) {
-            $data = $client->recv(3);
+
+            \Hyperf\Utils\Coroutine::sleep(0.01);
+
+            $data = $client->recv(1);
 
             // 这里检测一下gateway列表，如果当前地址已经不在列表内，则代表gateway掉线  退出当前wait
             // register监听到gateway掉线后，会通知给business  删除列表
@@ -133,13 +139,18 @@ class BusinessWorker implements WorkerInterface
                 return;
             }
 
-            if (! empty($data)) {
-                $data = json_decode($data, true);
-                if (! empty($data)) {
-                    $this->businessWorkerOnGatewayReceive($client, $data);
-                }
+            if(empty($data)){
+                continue;
             }
-            \Hyperf\Utils\Coroutine::sleep(0.01);
+
+            $data = json_decode($data, true);
+            if (empty($data)) {
+                continue;
+            }
+            Coroutine::create(function() use ($client, $data){
+                $this->businessWorkerOnGatewayReceive($client, $data);
+            });
+
         }
     }
 }
