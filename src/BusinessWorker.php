@@ -83,14 +83,20 @@ class BusinessWorker implements WorkerInterface
             \Hyperf\Engine\Coroutine::create(function() use($address) {
                 $client = new Client(SWOOLE_SOCK_TCP);
 
-                var_dump("尝试连接geteway". $address);
                 $addressMap = explode(':', $address);
 
-                if (!$client->connect($addressMap[0], $addressMap[1], 3)) {
-                    echo "business连接gateway失败. Error: {$client->errCode}\n";
-                    return;// TODO 这里连接一次就停止 看看是否需要持续尝试
+                $isConnected = false;
+                while(!$isConnected){
+                    if (!$client->connect($addressMap[0], $addressMap[1], 3)) {
+                        self::info("Business", "connect Gateway Error", $client->errCode);
+                        $client->close();
+                        \Hyperf\Utils\Coroutine::sleep(3);
+                        continue;
+                    }
+                    $isConnected = true;
                 }
-                var_dump("建立gateway连接");
+
+                self::info("Business", "connect Gateway Success", "");
 
                 // send "I am a business worker and wait receive message from gateway"
                 $r = $client->send(new BusinessConnectMessage("测试worker ip", "ok"));
