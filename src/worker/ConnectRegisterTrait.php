@@ -47,8 +47,6 @@ trait ConnectRegisterTrait
     /**
      * 维持与register的连接, 实现自动重连
      * TODO.
-     *
-     * @param $client
      */
     private function heartRegister()
     {
