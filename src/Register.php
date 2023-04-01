@@ -15,8 +15,6 @@ use Swoole\Timer;
 
 class Register extends BaseWorker
 {
-    public string $secretKey = '';
-
     protected array $gateways = [];
 
     protected array $workerConnections = [];
@@ -25,6 +23,13 @@ class Register extends BaseWorker
 
     /** fd => 验证超时定时器 ID */
     private $authTimeoutTimerMap = [];
+
+    public function __construct(
+        public string $registerAddress = '0.0.0.0',
+        public int $registerPort = 1236,
+        public string $secretKey = '',
+    ) {
+    }
 
     public function onStart(): void
     {
@@ -67,9 +72,9 @@ class Register extends BaseWorker
                     $this->server->close($fd);
                     return;
                 }
-                $secretKey = $revData['secret_key'] ?? '';
+                $secretKey = $revData['secretKey'] ?? '';
                 if ($secretKey !== $this->secretKey) {
-                    echo "Register secret_key error IP: {$connection['remote_ip'] } ." . PHP_EOL;
+                    echo "Register secret_key error IP: {$connection['remote_ip'] } Error Key: {$secretKey} ." . PHP_EOL;
                     $this->server->close($fd);
                     return;
                 }
@@ -107,7 +112,7 @@ class Register extends BaseWorker
 
     public function start($daemon = false)
     {
-        $this->server = $server = new \Swoole\Server('0.0.0.0', 1236, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $this->server = $server = new \Swoole\Server($this->registerAddress, $this->registerPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
         $server->set([
             'worker_num' => 1,
             'daemonize' => $daemon,

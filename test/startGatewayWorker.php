@@ -10,4 +10,6 @@ use Friendsofhyperf\Gateway\GatewayWorker;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-(new GatewayWorker())->start(false);
+(new GatewayWorker(
+    secretKey: 'friendsofhyperf'
+))->start(false);

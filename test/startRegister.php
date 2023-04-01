@@ -10,4 +10,6 @@ use Friendsofhyperf\Gateway\Register;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-(new Register())->start(false);
+(new Register(
+    secretKey: 'friendsofhyperf'
+))->start(false);

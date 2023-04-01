@@ -31,6 +31,7 @@ class BusinessWorker extends BaseWorker
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,
         public int $pingInterval = 30,
+        public string $secretKey = '',
     ) {
     }
 
@@ -68,7 +69,7 @@ class BusinessWorker extends BaseWorker
     protected function onRegisterConnect($client)
     {
         // 发送secretKey
-        $client->send(new ConnectMessage('business的ip', ConnectMessage::TYPE_BUSINESS));
+        $client->send(new ConnectMessage('business的ip', ConnectMessage::TYPE_BUSINESS, $this->secretKey));
     }
 
     protected function onRegisterReceive($client, $data)

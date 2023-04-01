@@ -31,6 +31,7 @@ class GatewayWorker extends BaseWorker
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,
         public int $pingInterval = 30,
+        public string $secretKey = '',
     ) {
     }
 
@@ -115,7 +116,7 @@ class GatewayWorker extends BaseWorker
         $client->send(new ConnectMessage(join(':', [
             $this->lanIp,
             $this->lanPort,
-        ]), ConnectMessage::TYPE_GATEWAY));
+        ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
     }
 
     protected function onRegisterReceive($client, $data)

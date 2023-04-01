@@ -10,4 +10,6 @@ use Friendsofhyperf\Gateway\BusinessWorker;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-(new BusinessWorker())->start(false);
+(new BusinessWorker(
+    secretKey: 'friendsofhyperf'
+))->start(false);
