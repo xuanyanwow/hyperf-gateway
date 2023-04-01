@@ -144,7 +144,7 @@ class Register extends BaseWorker
      */
     public function broadcastAddresses()
     {
-        foreach ($this->workerConnections as $fd => $ip) {
+        foreach ($this->workerConnections as $fd) {
             $this->server->send($fd, new GatewayInfoMessage($this->gateways));
         }
     }
