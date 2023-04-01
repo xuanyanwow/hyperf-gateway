@@ -17,6 +17,8 @@ class Register extends BaseWorker
 {
     protected array $gateways = [];
 
+    protected array $workerConnections = [];
+
     protected \Swoole\Server $server;
 
     /** fd => 验证超时定时器 ID */
@@ -42,6 +44,10 @@ class Register extends BaseWorker
     public function onMessage($fd, $revData)
     {
         $this->clearTimer($fd);
+
+        $connection = $this->server->getClientInfo($fd);
+        $originRevData = $revData;
+
         $revData = trim($revData);
         $revData = json_decode($revData, true);
         if (! isset($revData['class'])) {
@@ -55,14 +61,16 @@ class Register extends BaseWorker
             // business直接返回所有gateway信息
             case ConnectMessage::CMD:
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
-                    $this->gateways[$revData['ip']] = $fd;
+                    $this->gateways[$fd] = $revData['ip'];
                     return new SuccessMessage('register connected');
                 }
                 if ($revData['type'] === ConnectMessage::TYPE_BUSINESS) {
+                    $this->workerConnections[$fd] = $revData['ip'];
                     return new GatewayInfoMessage($this->gateways);
                 }
                 break;
             default:
+                echo "Register unknown event:{$revData['class']} IP: {$connection['remote_ip'] } ." . PHP_EOL;
                 break;
         }
     }
@@ -76,6 +84,10 @@ class Register extends BaseWorker
 
         if (! empty($this->gateways[$fd])) {
             unset($this->gateways[$fd]);
+            $this->broadcastAddresses();
+        }
+        if (! empty($this->workerConnections[$fd])) {
+            unset($this->workerConnections[$fd]);
         }
     }
 
@@ -89,9 +101,7 @@ class Register extends BaseWorker
         ]);
 
         $server->on('WorkerStart', function (\Swoole\Server $server, int $workerId) {
-            go(function () {
-                $this->onStart();
-            });
+            $this->onStart();
         });
         $server->on('connect', function (\Swoole\Server $server, int $fd, int $reactorId) {
             $this->onConnect($fd);
@@ -106,6 +116,17 @@ class Register extends BaseWorker
             $this->onClose($fd);
         });
         $server->start();
+    }
+
+    /**
+     * 广播所有gateway地址.
+     * @param null|mixed $connection
+     */
+    public function broadcastAddresses()
+    {
+        foreach ($this->workerConnections as $fd => $ip) {
+            $this->server->send($fd, new GatewayInfoMessage($this->gateways));
+        }
     }
 
     private function clearTimer($fd)
