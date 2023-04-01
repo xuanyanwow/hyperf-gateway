@@ -15,6 +15,8 @@ use Swoole\Timer;
 
 class Register extends BaseWorker
 {
+    public string $secretKey = '';
+
     protected array $gateways = [];
 
     protected array $workerConnections = [];
@@ -60,6 +62,18 @@ class Register extends BaseWorker
             // gateway存起来
             // business直接返回所有gateway信息
             case ConnectMessage::CMD:
+                if (empty($revData['ip'])) {
+                    echo "address not found\n";
+                    $this->server->close($fd);
+                    return;
+                }
+                $secretKey = $revData['secret_key'] ?? '';
+                if ($secretKey !== $this->secretKey) {
+                    echo "Register secret_key error IP: {$connection['remote_ip'] } ." . PHP_EOL;
+                    $this->server->close($fd);
+                    return;
+                }
+
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
                     $this->gateways[$fd] = $revData['ip'];
                     return new SuccessMessage('register connected');
