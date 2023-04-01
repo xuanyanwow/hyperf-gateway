@@ -68,24 +68,19 @@ class BusinessWorker extends BaseWorker
 
     protected function onRegisterConnect($client)
     {
-        // 发送secretKey
-        $client->send(new ConnectMessage('business的ip', ConnectMessage::TYPE_BUSINESS, $this->secretKey));
+        // 发送secretKey - business 不关注 ip
+        $client->send(new ConnectMessage('', ConnectMessage::TYPE_BUSINESS, $this->secretKey));
     }
 
     protected function onRegisterReceive($client, $data)
     {
         if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
-            // self::$registerClient = $client;
-
-            $this->connectGateway($data['list']);
-            $this->heartRegister();
+            $this->connectGateway($data['list'] ?? []);
             $this->waitGateway();
-            return false; // business不能跳出循环 要等待gateway的任务分发
+            return;
         }
 
         var_dump($data);
-
-        return false;
     }
 
     private function connectGateway($addressList)
@@ -103,7 +98,7 @@ class BusinessWorker extends BaseWorker
                 continue;
             }
             // send "I am a business worker and wait receive message from gateway"
-            $client->send(new BusinessConnectMessage('测试worker ip', 'ok'));
+            $client->send(new BusinessConnectMessage('', 'ok'));
             $data = $client->recv(10);
             if (! empty($data)) {
                 $data = json_decode($data, true);

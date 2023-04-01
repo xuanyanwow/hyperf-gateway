@@ -67,11 +67,6 @@ class Register extends BaseWorker
             // gateway存起来
             // business直接返回所有gateway信息
             case ConnectMessage::CMD:
-                if (empty($revData['ip'])) {
-                    echo "address not found\n";
-                    $this->server->close($fd);
-                    return;
-                }
                 $secretKey = $revData['secretKey'] ?? '';
                 if ($secretKey !== $this->secretKey) {
                     echo "Register secret_key error IP: {$connection['remote_ip'] } Error Key: {$secretKey} ." . PHP_EOL;
@@ -80,11 +75,17 @@ class Register extends BaseWorker
                 }
 
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
+                    if (empty($revData['ip'])) {
+                        echo "address not found\n";
+                        $this->server->close($fd);
+                        return;
+                    }
                     $this->gateways[$fd] = $revData['ip'];
                     return new SuccessMessage('register connected');
                 }
+                // business 不关注客户端 ip
                 if ($revData['type'] === ConnectMessage::TYPE_BUSINESS) {
-                    $this->workerConnections[$fd] = $revData['ip'];
+                    $this->workerConnections[$fd] = $fd;
                     return new GatewayInfoMessage($this->gateways);
                 }
                 break;
