@@ -76,7 +76,7 @@ class GatewayWorker extends BaseWorker
         // 保存客户端连接 connection 对象
         self::$clients[$fd] = $connection;
 
-        // 让 businessFd$businessFd 执行业务层的 onConnect 回调
+        // 让 business 执行业务层的 onConnect 回调
         $this->sendToWorker('client connect', $connection);
     }
 
@@ -119,9 +119,9 @@ class GatewayWorker extends BaseWorker
         });
         $server->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
             $response = $this->onMessage($fd, $data);
-            if (! empty($response)) {
-                $server->send($fd, $response);
-            }
+            // if (! empty($response)) {
+            //     $server->send($fd, $response);
+            // }
         });
         $server->on('close', function (\Swoole\Server $server, $fd) {
             $this->onClose($fd);
@@ -190,7 +190,7 @@ class GatewayWorker extends BaseWorker
     // onInternalClose
     protected function onInternalClose($server, $fd)
     {
-        var_dump('有 businessFd$businessFd 从gateway断开了');
+        var_dump('有 business 从gateway断开了');
         var_dump($this->server->getClientInfo($fd));
         if (isset(self::$businesses[$fd])) {
             unset(self::$businesses[$fd]);
@@ -211,7 +211,7 @@ class GatewayWorker extends BaseWorker
         switch ($revData['class']) {
             case BusinessConnectMessage::CMD:
                 self::$businesses[$fd] = $fd;
-                return new SuccessMessage('businessFd$businessFd connected');
+                return new SuccessMessage('business connected');
             default:
                 break;
         }
@@ -228,16 +228,17 @@ class GatewayWorker extends BaseWorker
     protected function onRegisterClose()
     {
         var_dump('检测到 register 断开');
+        // 可能要断线重连
     }
 
     protected function onInternalConnect($server, $fd)
     {
-        var_dump('gateway内部连接');
     }
 
     protected function onRegisterReceive($client, $data)
     {
         var_dump($data);
+        // TODO 最复杂的部分
     }
 
     /**
@@ -247,7 +248,37 @@ class GatewayWorker extends BaseWorker
     {
         go(function () {
             while (true) {
-                var_dump('维持business心跳和客户端心跳');
+                var_dump('维持客户端心跳');
+                // 遍历所有客户端连接
+                foreach (self::$clients as $fd => $connection) {
+                    // 上次发送的心跳还没有回复次数大于限定值就断开
+                    // if ($this->pingNotResponseLimit > 0
+                    //     && $connection->pingNotResponseCount >= $this->pingNotResponseLimit * 2
+                    // ) {
+                    //     $connection->destroy();
+                    //     continue;
+                    // }
+
+                    // $connection->pingNotResponseCount 为 -1 说明最近客户端有发来消息，则不给客户端发送心跳
+                    ++$connection->pingNotResponseCount;
+                    if ($connection->pingNotResponseCount === 0
+                        || ($this->pingNotResponseLimit > 0 && $connection->pingNotResponseCount % 2 === 1)
+                    ) {
+                        continue;
+                    }
+
+                    $this->server->send($fd, new PingMessage());
+                }
+                Coroutine::sleep(3);
+            }
+        });
+    }
+
+    private function heartBusiness()
+    {
+        go(function () {
+            while (true) {
+                var_dump('维持business心跳');
                 foreach (self::$businesses as $fd) {
                     $this->server->send($fd, new PingMessage());
                 }
