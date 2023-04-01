@@ -32,6 +32,7 @@ class BusinessWorker extends BaseWorker
         public int $registerConnectTimeout = 3,
         public int $pingInterval = 30,
         public string $secretKey = '',
+        public int $pingRegisterInterval = 3,
     ) {
     }
 
@@ -85,7 +86,7 @@ class BusinessWorker extends BaseWorker
 
     private function connectGateway($addressList)
     {
-        foreach ($addressList as $address => $fd) {
+        foreach ($addressList as $fd => $address) {
             if (isset(self::$gateways[$address])) {
                 continue;
             }

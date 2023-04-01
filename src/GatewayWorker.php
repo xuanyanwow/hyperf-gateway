@@ -32,6 +32,7 @@ class GatewayWorker extends BaseWorker
         public int $registerConnectTimeout = 3,
         public int $pingInterval = 30,
         public string $secretKey = '',
+        public int $pingRegisterInterval = 3,
     ) {
     }
 
@@ -43,7 +44,7 @@ class GatewayWorker extends BaseWorker
         $this->connectRegister();
 
         // 维持business心跳和客户端心跳
-        $this->heartClient();
+        // $this->heartClient();
     }
 
     public function onConnect($fd): void
@@ -92,9 +93,7 @@ class GatewayWorker extends BaseWorker
         ]);
 
         $server->on('WorkerStart', function (\Swoole\Server $server, int $workerId) {
-            go(function () {
-                $this->onStart();
-            });
+            $this->onStart();
         });
         $server->on('connect', function ($server, $fd) {
             $this->onConnect($fd);
@@ -108,19 +107,42 @@ class GatewayWorker extends BaseWorker
         $server->on('close', function ($server, $fd) {
             $this->onClose($fd);
         });
+
+        $this->startInternalServer();
+
         $server->start();
+    }
+
+    protected function startInternalServer()
+    {
+        $internalPort = $this->server->listen($this->lanIp, $this->lanPort + 1, SWOOLE_SOCK_TCP);
+        $internalPort->on('connect', function ($server, $fd) {
+            $this->onInternalConnect($server, $fd);
+        });
+        echo "gateway internal server setting\n";
     }
 
     protected function onRegisterConnect($client)
     {
         $client->send(new ConnectMessage(join(':', [
             $this->lanIp,
-            $this->lanPort,
+            $this->lanPort + 1, // 内部端口
         ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
+    }
+
+    protected function onRegisterClose()
+    {
+        var_dump('检测到 register 断开');
+    }
+
+    protected function onInternalConnect($server, $fd)
+    {
+        var_dump('gateway内部连接');
     }
 
     protected function onRegisterReceive($client, $data)
     {
+        var_dump($data);
     }
 
     /**

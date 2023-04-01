@@ -18,7 +18,7 @@ trait ConnectRegisterTrait
 
     protected function connectRegister()
     {
-        $client = new Client(SWOOLE_SOCK_TCP);
+        $this->registerClient = $client = new Client(SWOOLE_SOCK_TCP);
 
         if (! $client->connect($this->registerAddress, $this->registerPort, $this->registerConnectTimeout)) {
             echo "connect failed. Error: {$client->errCode}\n";
@@ -30,12 +30,12 @@ trait ConnectRegisterTrait
         }
 
         // 不在本地服务器 保持心跳
-        if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
-            $this->heartRegister();
-        }
+        // if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
+        $this->heartRegister();
+        // }
 
         while (true) {
-            $data = $client->recv();
+            $data = $client->recv(-1);
 
             if (! empty($data)) {
                 if (method_exists($this, 'onRegisterReceive')) {
@@ -64,7 +64,6 @@ trait ConnectRegisterTrait
         go(function () {
             while (true) {
                 $res = $this->registerClient->send(new PingMessage());
-                var_dump("register ping: {$res}");
                 Coroutine::sleep($this->pingRegisterInterval);
             }
         });

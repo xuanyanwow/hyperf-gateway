@@ -8,6 +8,7 @@
  */
 namespace Friendsofhyperf\Gateway;
 
+use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\register\GatewayInfoMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
@@ -44,7 +45,7 @@ class Register extends BaseWorker
         $this->authTimeoutTimerMap[$fd] = Timer::after(1000, function ($fd) {
             $connection = $this->server->getClientInfo($fd);
             echo 'Register auth timeout (' . $connection['remote_ip'] . '). See http://doc2.workerman.net/register-auth-timeout.html' . PHP_EOL;
-            $this->server->close($fd);
+        // $this->server->close($fd);
         }, $fd);
     }
 
@@ -88,7 +89,10 @@ class Register extends BaseWorker
                     $this->workerConnections[$fd] = $fd;
                     return new GatewayInfoMessage($this->gateways);
                 }
+
                 break;
+            case PingMessage::CMD:
+                return;
             default:
                 echo "Register unknown event:{$revData['class']} IP: {$connection['remote_ip'] } ." . PHP_EOL;
                 break;
@@ -101,6 +105,7 @@ class Register extends BaseWorker
         // 区分是gateway还是business
         // gateway删除 通知所有business
         var_dump('register 中有人断开' . $fd);
+        var_dump($this->server->getClientInfo($fd));
 
         if (! empty($this->gateways[$fd])) {
             unset($this->gateways[$fd]);
