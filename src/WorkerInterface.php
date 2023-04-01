@@ -12,7 +12,7 @@ interface WorkerInterface
 {
     public function start($daemon = false);
 
-    public function onStart();
+    public function onStart(int $workerId);
 
     public function onConnect($fd);
 

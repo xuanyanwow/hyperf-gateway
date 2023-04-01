@@ -32,7 +32,7 @@ class Register extends BaseWorker
     ) {
     }
 
-    public function onStart(): void
+    public function onStart(int $workerId): void
     {
         echo "\n====================\nregister start \n====================\n\n";
 
@@ -105,7 +105,6 @@ class Register extends BaseWorker
         // 区分是gateway还是business
         // gateway删除 通知所有business
         var_dump('register 中有人断开' . $fd);
-        var_dump($this->server->getClientInfo($fd));
 
         if (! empty($this->gateways[$fd])) {
             unset($this->gateways[$fd]);
@@ -126,7 +125,7 @@ class Register extends BaseWorker
         ]);
 
         $server->on('WorkerStart', function (\Swoole\Server $server, int $workerId) {
-            $this->onStart();
+            $this->onStart($workerId);
         });
         $server->on('connect', function (\Swoole\Server $server, int $fd, int $reactorId) {
             $this->onConnect($fd);

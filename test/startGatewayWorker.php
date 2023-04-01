@@ -11,5 +11,6 @@ use Friendsofhyperf\Gateway\GatewayWorker;
 require __DIR__ . '/../vendor/autoload.php';
 
 (new GatewayWorker(
-    secretKey: 'friendsofhyperf'
+    secretKey: 'friendsofhyperf',
+    workerNumber: 2,
 ))->start(false);

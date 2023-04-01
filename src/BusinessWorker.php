@@ -36,7 +36,7 @@ class BusinessWorker extends BaseWorker
     ) {
     }
 
-    public function onStart(): void
+    public function onStart(int $workerId): void
     {
         echo "\n====================\nbusiness start \n====================\n\n";
     }
@@ -63,7 +63,7 @@ class BusinessWorker extends BaseWorker
     {
         go(function () {
             $this->connectRegister();
-            $this->onStart();
+            $this->onStart(0);
         });
     }
 

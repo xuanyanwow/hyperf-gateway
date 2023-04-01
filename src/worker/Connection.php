@@ -8,6 +8,14 @@
  */
 namespace Friendsofhyperf\Gateway\worker;
 
-class Connect
+class Connection
 {
+    public $gatewayHeader;
+
+    // 构造函数
+    public function __construct(
+        array $clientInfo
+    ) {
+        var_dump($clientInfo);
+    }
 }

@@ -12,6 +12,7 @@ use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
+use Friendsofhyperf\Gateway\worker\Connection;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
 use Swoole\Coroutine;
 
@@ -19,13 +20,21 @@ class GatewayWorker extends BaseWorker
 {
     use ConnectRegisterTrait;
 
+    /** 工作进程(含client短暂连接) */
     protected static array $businesses = [];
+
+    /** 客户端 */
+    protected static array $clients = [];
+
+    protected int $startTime;
 
     private \Swoole\Server $server;
 
     public function __construct(
+        public string $listenIp = '127.0.0.1',
+        public int $listenPort = 9501,
         public string $lanIp = '127.0.0.1',
-        public int $lanPort = 9501,
+        public int $lanPort = 9502,
         public int $workerNumber = 1,
         public string $registerAddress = '127.0.0.1',
         public int $registerPort = 1236,
@@ -36,26 +45,162 @@ class GatewayWorker extends BaseWorker
     ) {
     }
 
-    public function onStart(): void
+    public function onStart(int $workerId): void
     {
-        echo "\n====================\ngateway start \n====================\n\n";
+        if ($workerId === 0) {
+            echo "\n====================\ngateway start \n====================\n\n";
+            // 上报register
+            $this->connectRegister();
+        }
 
-        // 上报register
-        $this->connectRegister();
-
-        // 维持business心跳和客户端心跳
-        // $this->heartClient();
+        $this->startTime = time();
+        // TODO 如果有设置心跳，则定时执行
     }
 
     public function onConnect($fd): void
     {
-        echo "gateway worker connect\n";
-        // 转发给business
+        $clientInfo = $this->server->getClientInfo($fd);
+        $connection = new Connection($clientInfo);
+
+        // 保存该连接的内部通讯的数据包报头，避免每次重新初始化
+        $connection->gatewayHeader = [
+            'local_ip' => ip2long($this->lanIp),
+            'local_port' => $this->lanPort,
+            'client_ip' => ip2long($clientInfo['remote_ip']),
+            'client_port' => $clientInfo['remote_port'],
+            'gateway_port' => $this->listenPort,
+            'connection_id' => $fd,
+            'flag' => 0,
+        ];
+
+        // 保存客户端连接 connection 对象
+        self::$clients[$fd] = $connection;
+
+        // 让 businessFd$businessFd 执行业务层的 onConnect 回调
+        $this->sendToWorker('client connect', $connection);
     }
 
     public function onMessage($fd, $revData)
     {
-        echo "gateway worker message\n";
+        $connection = self::$clients[$fd];
+        $this->sendToWorker('client message', $connection, $revData);
+    }
+
+    public function onClose($fd): void
+    {
+        $connection = self::$clients[$fd];
+        // 尝试通知 worker，触发 Event::onClose
+        $this->sendToWorker('client close', $connection);
+    }
+
+    public function start($daemon = false)
+    {
+        // gateway进程对外开放
+        // 如为公网IP监听，直接换成0.0.0.0 ，否则用内网IP
+        $listenIp = filter_var($this->listenIp, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)
+            ? '0.0.0.0'
+            : $this->listenIp;
+
+        $this->server = $server = new \Swoole\Server($listenIp, $this->listenPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+
+        $this->startInternalServer();
+
+        $server->set([
+            'worker_num' => $this->workerNumber,
+            'daemonize' => $daemon,
+            'enable_coroutine' => true,
+        ]);
+
+        $server->on('WorkerStart', function (\Swoole\Server $server, int $workerId) {
+            $this->onStart($workerId);
+        });
+        $server->on('connect', function (\Swoole\Server $server, $fd) {
+            $this->onConnect($fd);
+        });
+        $server->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
+            $response = $this->onMessage($fd, $data);
+            if (! empty($response)) {
+                $server->send($fd, $response);
+            }
+        });
+        $server->on('close', function (\Swoole\Server $server, $fd) {
+            $this->onClose($fd);
+        });
+
+        $server->start();
+    }
+
+    public static function routerBind($businesses, $connection, $cmd, $buffer)
+    {
+        if (! isset($connection->businessworker_address) || ! isset($businesses[$connection->businessworker_address])) {
+            $connection->businessworker_address = array_rand($businesses);
+        }
+        return $businesses[$connection->businessworker_address];
+    }
+
+    protected function sendToWorker($cmd, Connection $connection, $body = '')
+    {
+        if (empty(self::$businesses)) {
+            // 没有可用的 worker
+            // gateway 启动后 1-2 秒内 SendBufferToWorker fail 是正常现象，因为与 worker 的连接还没建立起来，
+            // 所以不记录日志，只是关闭连接
+            $time_diff = 2;
+            if (time() - $this->startTime >= $time_diff) {
+                $msg = 'SendBufferToWorker fail. The connections between Gateway and BusinessWorker are not ready. See http://doc2.workerman.net/send-buffer-to-worker-fail.html';
+                echo $msg . PHP_EOL;
+            }
+            // $connection->destroy();
+            return false;
+        }
+
+        // TODO 换成message 类
+        $gatewayData = $connection->gatewayHeader;
+        $gatewayData['cmd'] = $cmd;
+        $gatewayData['body'] = $body;
+
+        // 调用路由函数，选择一个worker把请求转发给它
+        /** @var int $businessFd */
+        $businessFd = call_user_func([$this, 'routerBind'], self::$businesses, $connection, $cmd, $body);
+
+        if ($this->server->send($businessFd, json_encode($gatewayData)) === false) {
+            $msg = 'SendBufferToWorker fail. May be the send buffer are overflow. See http://doc2.workerman.net/send-buffer-overflow.html';
+            echo $msg . PHP_EOL;
+            return false;
+        }
+        return true;
+    }
+
+    protected function startInternalServer()
+    {
+        $internalPort = $this->server->listen($this->lanIp, $this->lanPort, SWOOLE_SOCK_TCP);
+
+        $internalPort->on('connect', function (\Swoole\Server $server, $fd) {
+            $this->onInternalConnect($server, $fd);
+        });
+
+        $internalPort->on('close', function (\Swoole\Server $server, $fd) {
+            $this->onInternalClose($server, $fd);
+        });
+
+        $internalPort->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
+            $this->onInternalReceive($server, $fd, $reactor_id, $data);
+        });
+    }
+
+    // onInternalClose
+    protected function onInternalClose($server, $fd)
+    {
+        var_dump('有 businessFd$businessFd 从gateway断开了');
+        var_dump($this->server->getClientInfo($fd));
+        if (isset(self::$businesses[$fd])) {
+            unset(self::$businesses[$fd]);
+        }
+    }
+
+    // onInternalReceive
+    protected function onInternalReceive($server, $fd, $reactor_id, $revData)
+    {
+        var_dump('gateway内部连接收到消息');
         // 转发到business
         var_dump($revData);
         $revData = json_decode($revData, true);
@@ -66,67 +211,17 @@ class GatewayWorker extends BaseWorker
         switch ($revData['class']) {
             case BusinessConnectMessage::CMD:
                 self::$businesses[$fd] = $fd;
-                return new SuccessMessage('business connected');
+                return new SuccessMessage('businessFd$businessFd connected');
             default:
                 break;
         }
-
-        return false;
-    }
-
-    public function onClose($fd): void
-    {
-        var_dump('有人从gateway断开了');
-        if (isset(self::$businesses[$fd])) {
-            unset(self::$businesses[$fd]);
-        }
-    }
-
-    public function start($daemon = false)
-    {
-        // gateway进程对外开放
-        $this->server = $server = new \Swoole\Server('0.0.0.0', $this->lanPort, SWOOLE_BASE, SWOOLE_SOCK_TCP);
-        $server->set([
-            'worker_num' => $this->workerNumber,
-            'daemonize' => $daemon,
-            'enable_coroutine' => true,
-        ]);
-
-        $server->on('WorkerStart', function (\Swoole\Server $server, int $workerId) {
-            $this->onStart();
-        });
-        $server->on('connect', function ($server, $fd) {
-            $this->onConnect($fd);
-        });
-        $server->on('receive', function (\Swoole\Server $server, $fd, $reactor_id, $data) {
-            $response = $this->onMessage($fd, $data);
-            if (! empty($response)) {
-                $server->send($fd, $response);
-            }
-        });
-        $server->on('close', function ($server, $fd) {
-            $this->onClose($fd);
-        });
-
-        $this->startInternalServer();
-
-        $server->start();
-    }
-
-    protected function startInternalServer()
-    {
-        $internalPort = $this->server->listen($this->lanIp, $this->lanPort + 1, SWOOLE_SOCK_TCP);
-        $internalPort->on('connect', function ($server, $fd) {
-            $this->onInternalConnect($server, $fd);
-        });
-        echo "gateway internal server setting\n";
     }
 
     protected function onRegisterConnect($client)
     {
         $client->send(new ConnectMessage(join(':', [
             $this->lanIp,
-            $this->lanPort + 1, // 内部端口
+            $this->lanPort, // 内部端口
         ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
     }
 
