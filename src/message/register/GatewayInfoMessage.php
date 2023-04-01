@@ -16,10 +16,7 @@ class GatewayInfoMessage extends BaseMessage
 
     public string $class = self::CMD;
 
-    public array $list = [];
-
-    public function __construct($list)
+    public function __construct(public array $list)
     {
-        $this->list = $list;
     }
 }

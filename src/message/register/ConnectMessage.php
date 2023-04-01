@@ -20,13 +20,7 @@ class ConnectMessage extends BaseMessage
 
     public string $class = self::CMD;
 
-    public string $ip;
-
-    public string $type;
-
-    public function __construct(string $ip, string $type)
+    public function __construct(public string $ip, public string $type, public string $secretKey)
     {
-        $this->ip = $ip;
-        $this->type = $type;
     }
 }
