@@ -39,7 +39,7 @@ class GatewayWorker extends BaseWorker
         public string $registerAddress = '127.0.0.1',
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,
-        public int $pingInterval = 30,
+        public int $pingInterval = 10,
         public string $secretKey = '',
         public int $pingRegisterInterval = 3,
     ) {
@@ -54,7 +54,15 @@ class GatewayWorker extends BaseWorker
         }
 
         $this->startTime = time();
-        // TODO 如果有设置心跳，则定时执行
+        // 如果有设置心跳，则定时执行
+        if ($this->pingInterval > 0) {
+            $this->heartClient();
+        }
+
+        // 如果BusinessWorker ip不是127.0.0.1，则需要加gateway到BusinessWorker的心跳
+        if ($this->lanIp !== '127.0.0.1') {
+            $this->heartBusiness();
+        }
     }
 
     public function onConnect($fd): void
@@ -88,7 +96,9 @@ class GatewayWorker extends BaseWorker
 
     public function onClose($fd): void
     {
+        /** @var Connection $connection */
         $connection = self::$clients[$fd];
+        $connection->pingNotResponseCount = -1;
         // 尝试通知 worker，触发 Event::onClose
         $this->sendToWorker('client close', $connection);
     }
@@ -262,14 +272,14 @@ class GatewayWorker extends BaseWorker
                     // $connection->pingNotResponseCount 为 -1 说明最近客户端有发来消息，则不给客户端发送心跳
                     ++$connection->pingNotResponseCount;
                     if ($connection->pingNotResponseCount === 0
-                        || ($this->pingNotResponseLimit > 0 && $connection->pingNotResponseCount % 2 === 1)
+                        // || ($this->pingNotResponseLimit > 0 && $connection->pingNotResponseCount % 2 === 1)
                     ) {
                         continue;
                     }
 
                     $this->server->send($fd, new PingMessage());
                 }
-                Coroutine::sleep(3);
+                Coroutine::sleep($this->pingInterval);
             }
         });
     }
