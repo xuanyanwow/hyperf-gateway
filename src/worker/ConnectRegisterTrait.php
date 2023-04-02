@@ -30,9 +30,9 @@ trait ConnectRegisterTrait
         }
 
         // 不在本地服务器 保持心跳
-        // if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
-        $this->heartRegister();
-        // }
+        if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
+            $this->heartRegister();
+        }
 
         while (true) {
             $data = $client->recv(-1);
