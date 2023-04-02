@@ -12,6 +12,8 @@ class Connection
 {
     public $gatewayHeader;
 
+    public $pingNotResponseCount = 0;
+
     // 构造函数
     public function __construct(
         array $clientInfo
