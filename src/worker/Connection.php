@@ -14,6 +14,8 @@ class Connection
 
     public $pingNotResponseCount = 0;
 
+    public $businessworkerAddress;
+
     // 构造函数
     public function __construct(
         array $clientInfo

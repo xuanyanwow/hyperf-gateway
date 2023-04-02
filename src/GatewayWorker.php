@@ -140,12 +140,12 @@ class GatewayWorker extends BaseWorker
         $server->start();
     }
 
-    public static function routerBind($businesses, $connection, $cmd, $buffer)
+    public static function routerBind($businesses, Connection $connection, $cmd, $buffer)
     {
-        if (! isset($connection->businessworker_address) || ! isset($businesses[$connection->businessworker_address])) {
-            $connection->businessworker_address = array_rand($businesses);
+        if (! isset($connection->businessworkerAddress) || ! isset($businesses[$connection->businessworkerAddress])) {
+            $connection->businessworkerAddress = array_rand($businesses);
         }
-        return $businesses[$connection->businessworker_address];
+        return $businesses[$connection->businessworkerAddress];
     }
 
     protected function sendToWorker($cmd, Connection $connection, $body = '')
