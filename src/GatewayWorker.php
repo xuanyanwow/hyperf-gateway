@@ -12,8 +12,8 @@ use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
-use Friendsofhyperf\Gateway\worker\Connection;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
+use Friendsofhyperf\Gateway\worker\TcpConnection;
 use Swoole\Coroutine;
 
 class GatewayWorker extends BaseWorker
@@ -68,7 +68,7 @@ class GatewayWorker extends BaseWorker
     public function onConnect($fd): void
     {
         $clientInfo = $this->server->getClientInfo($fd);
-        $connection = new Connection($clientInfo);
+        $connection = new TcpConnection($clientInfo);
 
         // 保存该连接的内部通讯的数据包报头，避免每次重新初始化
         $connection->gatewayHeader = [
@@ -96,7 +96,7 @@ class GatewayWorker extends BaseWorker
 
     public function onClose($fd): void
     {
-        /** @var Connection $connection */
+        /** @var TcpConnection $connection */
         $connection = self::$clients[$fd];
         $connection->pingNotResponseCount = -1;
         // 尝试通知 worker，触发 Event::onClose
@@ -140,7 +140,7 @@ class GatewayWorker extends BaseWorker
         $server->start();
     }
 
-    public static function routerBind($businesses, Connection $connection, $cmd, $buffer)
+    public static function routerBind($businesses, TcpConnection $connection, $cmd, $buffer)
     {
         if (! isset($connection->businessworkerAddress) || ! isset($businesses[$connection->businessworkerAddress])) {
             $connection->businessworkerAddress = array_rand($businesses);
@@ -148,7 +148,15 @@ class GatewayWorker extends BaseWorker
         return $businesses[$connection->businessworkerAddress];
     }
 
-    protected function sendToWorker($cmd, Connection $connection, $body = '')
+    public function onRegisterConnect($client)
+    {
+        $client->send(new ConnectMessage(join(':', [
+            $this->lanIp,
+            $this->lanPort, // 内部端口
+        ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
+    }
+
+    protected function sendToWorker($cmd, TcpConnection $connection, $body = '')
     {
         if (empty(self::$businesses)) {
             // 没有可用的 worker
@@ -227,28 +235,13 @@ class GatewayWorker extends BaseWorker
         }
     }
 
-    protected function onRegisterConnect($client)
-    {
-        $client->send(new ConnectMessage(join(':', [
-            $this->lanIp,
-            $this->lanPort, // 内部端口
-        ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
-    }
-
-    protected function onRegisterClose()
-    {
-        var_dump('检测到 register 断开');
-        // 可能要断线重连
-    }
-
     protected function onInternalConnect($server, $fd)
     {
     }
 
-    protected function onRegisterReceive($client, $data)
+    public function onRegisterReceive($client, $data)
     {
         var_dump($data);
-        // TODO 最复杂的部分
     }
 
     /**

@@ -21,7 +21,11 @@ class BusinessWorker extends BaseWorker
 {
     use ConnectRegisterTrait;
 
+    /** 连接通讯中的 gateway client */
     protected static array $gateways = [];
+
+    /** 正在尝试连接的 gateway address */
+    protected array $gatewayConnecting = [];
 
     // private static Client $registerClient;
 
@@ -39,6 +43,8 @@ class BusinessWorker extends BaseWorker
     public function onStart(int $workerId): void
     {
         echo "\n====================\nbusiness start \n====================\n\n";
+
+        $this->connectRegister();
     }
 
     public function onConnect($fd)
@@ -62,7 +68,6 @@ class BusinessWorker extends BaseWorker
     public function start($daemon = false)
     {
         go(function () {
-            $this->connectRegister();
             $this->onStart(0);
         });
     }
@@ -77,7 +82,6 @@ class BusinessWorker extends BaseWorker
     {
         if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
             $this->connectGateway($data['list'] ?? []);
-            $this->waitGateway();
             return;
         }
 
@@ -86,32 +90,51 @@ class BusinessWorker extends BaseWorker
 
     private function connectGateway($addressList)
     {
+        if (empty($addressList)) {
+            return;
+        }
+
         foreach ($addressList as $fd => $address) {
-            if (isset(self::$gateways[$address])) {
-                continue;
-            }
-            $client = new Client(SWOOLE_SOCK_TCP);
-
-            $addressMap = explode(':', $address);
-
-            if (! $client->connect($addressMap[0], $addressMap[1], 3)) {
-                echo "business连接gateway失败. Error: {$client->errCode}\n";
-                continue;
-            }
-            // send "I am a business worker and wait receive message from gateway"
-            $client->send(new BusinessConnectMessage('', 'ok'));
-            $data = $client->recv(10);
-            if (! empty($data)) {
-                $data = json_decode($data, true);
-                if ($data['class'] == SuccessMessage::CMD) {
-                    self::$gateways[$address] = $client;
-                    continue;
-                }
-                // 连接gateway 响应错误
-                var_dump('连接gateway 响应错误');
-                var_dump($data);
+            if (! isset($this->gatewayConnecting[$address])) {
+                $this->tryConnectGateway($address);
             }
         }
+    }
+
+    private function tryConnectGateway($address)
+    {
+        if (isset(self::$gateways[$address])) {
+            unset($this->gatewayConnecting[$address]);
+            return;
+        }
+        $this->gatewayConnecting[$address] = true;
+
+        $client = new Client(SWOOLE_SOCK_TCP);
+
+        $addressMap = explode(':', $address);
+
+        if (! $client->connect($addressMap[0], $addressMap[1], 3)) {
+            echo "business连接gateway失败. Error: {$client->errCode}\n";
+            return;
+        }
+        // TODO onGatewayConnect
+        // TODO onGatewayMessage
+        // TODO onGatewayClose
+
+        $client->send(new BusinessConnectMessage('', 'ok'));
+        $data = $client->recv(10);
+        if (! empty($data)) {
+            $data = json_decode($data, true);
+            if ($data['class'] == SuccessMessage::CMD) {
+                self::$gateways[$address] = $client;
+                return;
+            }
+            // 连接gateway 响应错误
+            var_dump('连接gateway 响应错误');
+            var_dump($data);
+        }
+
+        unset($this->gatewayConnecting[$address]);
     }
 
     /**

@@ -9,48 +9,44 @@
 namespace Friendsofhyperf\Gateway\worker;
 
 use Friendsofhyperf\Gateway\message\PingMessage;
-use Swoole\Coroutine;
-use Swoole\Coroutine\Client;
+use Swoole\Timer;
 
 trait ConnectRegisterTrait
 {
-    protected $registerClient;
+    protected TcpClient $registerClient;
+
+    public function onRegisterClose()
+    {
+        var_dump('检测到 register 断开');
+        // 断线重连
+        if (! empty($this->registerClient->pingTimer)) {
+            Timer::clear($this->registerClient->pingTimer);
+        }
+        $this->registerClient->reconnect(1);
+    }
 
     protected function connectRegister()
     {
-        $this->registerClient = $client = new Client(SWOOLE_SOCK_TCP);
-
-        if (! $client->connect($this->registerAddress, $this->registerPort, $this->registerConnectTimeout)) {
-            echo "connect failed. Error: {$client->errCode}\n";
-            return;
-        }
+        $this->registerClient = $client = new TcpClient($this->registerAddress, $this->registerPort, $this->registerConnectTimeout, 0);
 
         if (method_exists($this, 'onRegisterConnect')) {
-            $this->onRegisterConnect($client);
+            $client->setOnConnect([$this, 'onRegisterConnect']);
+        }
+        if (method_exists($this, 'onRegisterReceive')) {
+            $client->setOnMessage([$this, 'onRegisterReceive']);
+        }
+        if (method_exists($this, 'onRegisterClose')) {
+            $client->setOnClose([$this, 'onRegisterClose']);
+        }
+
+        if (! $client->connect()) {
+            echo "connect failed. Error: {$client->errCode}\n";
+            return;
         }
 
         // 不在本地服务器 保持心跳
         if (strpos($this->registerAddress, '127.0.0.1') !== 0) {
             $this->heartRegister();
-        }
-
-        while (true) {
-            $data = $client->recv(-1);
-
-            if (! empty($data)) {
-                if (method_exists($this, 'onRegisterReceive')) {
-                    $data = json_decode($data, true);
-                    $this->onRegisterReceive($client, $data);
-                }
-            } else {
-                $client->close();
-                if (method_exists($this, 'onRegisterClose')) {
-                    $this->onRegisterClose($client);
-                }
-                break;
-            }
-
-            Coroutine::sleep(1);
         }
     }
 
@@ -61,10 +57,10 @@ trait ConnectRegisterTrait
      */
     private function heartRegister()
     {
-        go(function () {
-            while (true) {
-                $res = $this->registerClient->send(new PingMessage());
-                Coroutine::sleep($this->pingRegisterInterval);
+        $this->registerClient->pingTimer = Timer::tick($this->pingRegisterInterval * 1000, function () {
+            $res = $this->registerClient->send(new PingMessage());
+            if (! $res) {
+                var_dump('ping register 失败');
             }
         });
     }

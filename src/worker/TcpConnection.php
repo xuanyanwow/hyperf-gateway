@@ -8,7 +8,7 @@
  */
 namespace Friendsofhyperf\Gateway\worker;
 
-class Connection
+class TcpConnection
 {
     public $gatewayHeader;
 
