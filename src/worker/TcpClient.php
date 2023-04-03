@@ -72,7 +72,6 @@ class TcpClient
     {
         if (
             $this->status !== self::STATUS_INITIAL
-            && $this->status !== self::STATUS_CLOSING
             && $this->status !== self::STATUS_CLOSED
         ) {
             return;
@@ -107,15 +106,13 @@ class TcpClient
                     }
                 } else {
                     if (! empty($this->onClose)) {
-                        var_dump('on close');
-
                         $this->status = self::STATUS_CLOSED;
                         call_user_func($this->onClose, $this);
                     }
                     break;
                 }
 
-                Coroutine::sleep(1);
+                Coroutine::sleep(0.05);
             }
         });
 
