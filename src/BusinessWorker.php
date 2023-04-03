@@ -72,13 +72,13 @@ class BusinessWorker extends BaseWorker
         });
     }
 
-    protected function onRegisterConnect($client)
+    public function onRegisterConnect($client)
     {
         // 发送secretKey - business 不关注 ip
         $client->send(new ConnectMessage('', ConnectMessage::TYPE_BUSINESS, $this->secretKey));
     }
 
-    protected function onRegisterReceive($client, $data)
+    public function onRegisterReceive($client, $data)
     {
         if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
             $this->connectGateway($data['list'] ?? []);

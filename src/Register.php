@@ -18,7 +18,7 @@ class Register extends BaseWorker
 {
     protected array $gateways = [];
 
-    protected array $workerConnections = [];
+    protected array $businessWorkerConnections = [];
 
     protected \Swoole\Server $server;
 
@@ -82,11 +82,14 @@ class Register extends BaseWorker
                         return;
                     }
                     $this->gateways[$fd] = $revData['ip'];
+
+                    $this->broadcastAddresses();
+
                     return new SuccessMessage('register connected');
                 }
                 // business 不关注客户端 ip
                 if ($revData['type'] === ConnectMessage::TYPE_BUSINESS) {
-                    $this->workerConnections[$fd] = $fd;
+                    $this->businessWorkerConnections[$fd] = $fd;
                     return new GatewayInfoMessage($this->gateways);
                 }
 
@@ -110,8 +113,8 @@ class Register extends BaseWorker
             unset($this->gateways[$fd]);
             $this->broadcastAddresses();
         }
-        if (! empty($this->workerConnections[$fd])) {
-            unset($this->workerConnections[$fd]);
+        if (! empty($this->businessWorkerConnections[$fd])) {
+            unset($this->businessWorkerConnections[$fd]);
         }
     }
 
@@ -148,7 +151,7 @@ class Register extends BaseWorker
      */
     public function broadcastAddresses()
     {
-        foreach ($this->workerConnections as $fd) {
+        foreach ($this->businessWorkerConnections as $fd) {
             $this->server->send($fd, new GatewayInfoMessage($this->gateways));
         }
     }
