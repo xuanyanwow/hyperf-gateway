@@ -50,6 +50,11 @@ class TcpClient
     ) {
     }
 
+    public function getAddressWithPort(): string
+    {
+        return $this->address . ':' . $this->port;
+    }
+
     // onConnect setter
     public function setOnConnect(callable|array $onConnect): void
     {

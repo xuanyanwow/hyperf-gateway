@@ -14,7 +14,7 @@ use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\register\GatewayInfoMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
-use Swoole\Coroutine;
+use Friendsofhyperf\Gateway\worker\TcpClient;
 use Swoole\Coroutine\Client;
 
 class BusinessWorker extends BaseWorker
@@ -54,10 +54,7 @@ class BusinessWorker extends BaseWorker
 
     public function onMessage($fd, $revData)
     {
-        echo "business worker message\n";
-        // 解析消息 调用逻辑
-        var_dump($fd);
-        var_dump($revData);
+        self::debug('business worker message', $fd, $revData);
     }
 
     public function onClose($fd)
@@ -80,12 +77,43 @@ class BusinessWorker extends BaseWorker
 
     public function onRegisterReceive($client, $data)
     {
+        $data = json_decode($data, true);
         if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
             $this->connectGateway($data['list'] ?? []);
             return;
         }
+    }
 
-        var_dump($data);
+    public function onGatewayConnect($client)
+    {
+        self::debug('business worker onGatewayConnect', $client->getAddressWithPort());
+        $client->send(new BusinessConnectMessage('', 'ok'));
+    }
+
+    public function onGatewayMessage(TcpClient $client, $data)
+    {
+        $data = json_decode($data, true);
+
+        $class = $data['class'];
+        if ($class == SuccessMessage::CMD) {
+            $address = $client->getAddressWithPort();
+            self::$gateways[$address] = $client;
+            return;
+        }
+        if ($class == PingMessage::CMD) {
+            return;
+        }
+
+        self::debug('business worker onGatewayMessage', $data);
+    }
+
+    public function onGatewayClose(TcpClient $client)
+    {
+        $address = $client->getAddressWithPort();
+        unset(self::$gateways[$address], $this->gatewayConnecting[$address]);
+
+        self::debug('business worker onGatewayClose', $address);
+        $client->reconnect(1);
     }
 
     private function connectGateway($addressList)
@@ -104,63 +132,30 @@ class BusinessWorker extends BaseWorker
     private function tryConnectGateway($address)
     {
         if (isset(self::$gateways[$address])) {
+            self::debug('已经连接过了' . $address);
             unset($this->gatewayConnecting[$address]);
             return;
         }
+
+        self::debug('尝试连接' . $address);
         $this->gatewayConnecting[$address] = true;
 
-        $client = new Client(SWOOLE_SOCK_TCP);
-
         $addressMap = explode(':', $address);
+        $client = new TcpClient($addressMap[0], $addressMap[1], 3);
 
-        if (! $client->connect($addressMap[0], $addressMap[1], 3)) {
-            echo "business连接gateway失败. Error: {$client->errCode}\n";
+        // onGatewayConnect
+        $client->setOnConnect([$this, 'onGatewayConnect']);
+
+        // onGatewayMessage
+        $client->setOnMessage([$this, 'onGatewayMessage']);
+
+        // onGatewayClose
+        $client->setOnClose([$this, 'onGatewayClose']);
+
+        if (! $client->connect()) {
+            self::debug("business连接gateway失败. Error: {$client->errCode}");
             return;
         }
-        // TODO onGatewayConnect
-        // TODO onGatewayMessage
-        // TODO onGatewayClose
-
-        $client->send(new BusinessConnectMessage('', 'ok'));
-        $data = $client->recv(10);
-        if (! empty($data)) {
-            $data = json_decode($data, true);
-            if ($data['class'] == SuccessMessage::CMD) {
-                self::$gateways[$address] = $client;
-                return;
-            }
-            // 连接gateway 响应错误
-            var_dump('连接gateway 响应错误');
-            var_dump($data);
-        }
-
-        unset($this->gatewayConnecting[$address]);
-    }
-
-    /**
-     * 监听gateway的任务分发.
-     * @return mixed
-     */
-    private function waitGateway()
-    {
-        while (true) {
-            /** @var Client $client */
-            foreach (self::$gateways as $address => $client) {
-                $data = $client->recv(0.1);
-                if (! empty($data)) {
-                    $data = json_decode($data, true);
-                    if (! empty($data)) {
-                        if ($data['class'] == PingMessage::CMD) {
-                            continue;
-                        }
-                        go(function () use ($client, $data) {
-                            $this->onMessage($client->exportSocket()->fd, $data);
-                        });
-                    }
-                }
-            }
-
-            Coroutine::sleep(0.01);
-        }
+        self::debug('business连接gateway成功' . $address);
     }
 }
