@@ -27,6 +27,7 @@ trait ConnectRegisterTrait
 
     protected function connectRegister()
     {
+        // feature 多个register
         $this->registerClient = $client = new TcpClient($this->registerAddress, $this->registerPort, $this->registerConnectTimeout, 0);
 
         if (method_exists($this, 'onRegisterConnect')) {

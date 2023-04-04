@@ -81,10 +81,18 @@ class BusinessWorker extends BaseWorker
     public function onRegisterReceive($client, $data)
     {
         $data = json_decode($data, true);
-        if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
-            $this->gatewayAddresses = $data['list'] ?? [];
-            $this->connectGateway($data['list'] ?? []);
-            return;
+
+        $cmd = $data['class'] ?? '';
+
+        switch ($cmd) {
+            case GatewayInfoMessage::CMD:
+                // feature 多个register中心  地址要合并 不能覆盖
+                $this->gatewayAddresses = $data['list'] ?? [];
+                $this->connectGateway($data['list'] ?? []);
+                return;
+            default:
+                echo "Receive bad cmd:{$cmd} from Register.\n";
+                break;
         }
     }
 
@@ -109,6 +117,8 @@ class BusinessWorker extends BaseWorker
         }
 
         self::debug('business worker onGatewayMessage', $data);
+
+        // TODO 最复杂的转发逻辑
     }
 
     public function onGatewayClose(TcpClient $client)
