@@ -96,21 +96,21 @@ class BusinessWorker extends BaseWorker
         }
     }
 
-    public function onGatewayConnect($client)
+    public function onGatewayConnect($gateway)
     {
-        self::debug('business worker onGatewayConnect', $client->getAddressWithPort());
-        $client->send(new BusinessConnectMessage('', 'ok'));
+        self::debug('business worker onGatewayConnect', $gateway->getAddressWithPort());
+        $gateway->send(new BusinessConnectMessage('', 'ok'));
     }
 
-    public function onGatewayMessage(TcpClient $client, $data)
+    public function onGatewayMessage(TcpClient $gateway, $data)
     {
         $data = json_decode($data, true);
 
         $class = $data['class'];
         switch ($class) {
             case SuccessMessage::CMD:
-                $address = $client->getAddressWithPort();
-                self::$gateways[$address] = $client;
+                $address = $gateway->getAddressWithPort();
+                self::$gateways[$address] = $gateway;
                 return;
             case PingMessage::CMD:
                 return;
@@ -121,9 +121,9 @@ class BusinessWorker extends BaseWorker
         // TODO 最复杂的转发逻辑
     }
 
-    public function onGatewayClose(TcpClient $client)
+    public function onGatewayClose(TcpClient $gateway)
     {
-        $address = $client->getAddressWithPort();
+        $address = $gateway->getAddressWithPort();
         unset(self::$gateways[$address], $this->gatewayConnecting[$address]);
 
         self::debug('business worker onGatewayClose', $address);
@@ -131,7 +131,7 @@ class BusinessWorker extends BaseWorker
         // 不能直接重连，要判断一下地址是否还有效(register返回)
         if (isset($this->gatewayAddresses[$address])) {
             self::debug('business worker onGatewayClose 重连', $address);
-            $client->reconnect(1);
+            $gateway->reconnect(1);
         }
     }
 
@@ -168,19 +168,19 @@ class BusinessWorker extends BaseWorker
         $this->gatewayConnecting[$address] = true;
 
         $addressMap = explode(':', $address);
-        $client = new TcpClient($addressMap[0], $addressMap[1], 3);
+        $gateway = new TcpClient($addressMap[0], $addressMap[1], 3);
 
         // onGatewayConnect
-        $client->setOnConnect([$this, 'onGatewayConnect']);
+        $gateway->setOnConnect([$this, 'onGatewayConnect']);
 
         // onGatewayMessage
-        $client->setOnMessage([$this, 'onGatewayMessage']);
+        $gateway->setOnMessage([$this, 'onGatewayMessage']);
 
         // onGatewayClose
-        $client->setOnClose([$this, 'onGatewayClose']);
+        $gateway->setOnClose([$this, 'onGatewayClose']);
 
-        if (! $client->connect()) {
-            self::debug("business连接gateway失败. Error: {$client->errCode}");
+        if (! $gateway->connect()) {
+            self::debug("business连接gateway失败. Error: {$gateway->errCode}");
             return;
         }
         self::debug('business连接gateway成功' . $address);
