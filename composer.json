@@ -3,7 +3,8 @@
     "type": "library",
     "autoload": {
         "psr-4": {
-            "Friendsofhyperf\\Gateway\\": "src/"
+            "Friendsofhyperf\\Gateway\\": "src/",
+            "Friendsofhyperf\\Gateway\\Test\\": "test/"
         }
     },
     "authors": [
@@ -15,7 +16,7 @@
     "require": {
         "hyperf/command": "~3.0.0",
         "swoole/ide-helper": "^5.0",
-      "ext-sockets": "*"
+        "ext-sockets": "*"
     },
     "extra": {
         "hyperf": {

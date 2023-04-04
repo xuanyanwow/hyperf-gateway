@@ -6,6 +6,8 @@
  * @document https://github.com/xuanyanwow/hyperf-gateway/blob/master/README.md
  * @author   siam
  */
+namespace Friendsofhyperf\Gateway\Test\event;
+
 use Friendsofhyperf\Gateway\interface\EventInterface;
 
 class TestEvent implements EventInterface

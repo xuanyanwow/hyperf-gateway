@@ -12,5 +12,5 @@ require __DIR__ . '/../vendor/autoload.php';
 
 (new GatewayWorker(
     secretKey: 'friendsofhyperf',
-    workerNumber: 2,
+    workerNumber: 1,
 ))->start(false);

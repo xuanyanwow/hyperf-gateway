@@ -118,18 +118,20 @@ class BusinessWorker extends BaseWorker
 
         self::debug('business worker onGatewayMessage', $data);
 
-        // 请求上下文
-        $request = new Request(
-            clientIp: $data['client_ip'],
-            clientPort: $data['client_port'],
-            gatewayIp: $data['gateway_ip'],
-            gatewayPort: $data['gateway_port'],
-            internalPort: $data['internal_port'],
-            connectionId: $data['connection_id'],
-            clientId: $data['client_id'],
-        );
-
         $cmd = $data['cmd'];
+        // 请求上下文  cmd 不能是SuccessMessage和PingMessage
+        if (! in_array($cmd, [SuccessMessage::CMD, PingMessage::CMD])) {
+            $request = new Request(
+                clientIp: $data['client_ip'],
+                clientPort: $data['client_port'],
+                gatewayIp: $data['gateway_ip'],
+                gatewayPort: $data['gateway_port'],
+                internalPort: $data['internal_port'],
+                connectionId: $data['connection_id'],
+                clientId: $data['client_id'],
+            );
+        }
+
         switch ($cmd) {
             case SuccessMessage::CMD:
                 $address = $gateway->getAddressWithPort();
@@ -144,12 +146,12 @@ class BusinessWorker extends BaseWorker
                 break;
             case RedirectionMessage::CMD_WEBSOCKET_CONNECT :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onWebsocketConnect($request, []);
+                    $this->customerEvent->onWebsocketConnect($request, $data['body'] ?? []);
                 }
                 break;
             case RedirectionMessage::CMD_MESSAGE :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onMessage($request, $data['data']);
+                    $this->customerEvent->onMessage($request, $data['body']);
                 }
                 break;
             case RedirectionMessage::CMD_CLOSE :

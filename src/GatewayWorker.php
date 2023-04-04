@@ -174,7 +174,7 @@ class GatewayWorker extends BaseWorker
                 $msg = 'SendBufferToWorker fail. The connections between Gateway and BusinessWorker are not ready. See http://doc2.workerman.net/send-buffer-to-worker-fail.html';
                 echo $msg . PHP_EOL;
             }
-            // $connection->destroy();
+            $this->server->close($connection->gatewayHeader['connection_id']);
             return false;
         }
 
@@ -235,7 +235,9 @@ class GatewayWorker extends BaseWorker
         switch ($revData['cmd']) {
             case BusinessConnectMessage::CMD:
                 self::$businesses[$fd] = $fd;
-                return new SuccessMessage('business connected');
+                self::debug('business connected', $fd, self::$businesses);
+                $server->send($fd, new SuccessMessage('business connected'));
+                break;
             default:
                 break;
         }
@@ -252,7 +254,6 @@ class GatewayWorker extends BaseWorker
     {
         go(function () {
             while (true) {
-                var_dump('维持客户端心跳');
                 // 遍历所有客户端连接
                 foreach (self::$clients as $fd => $connection) {
                     // 上次发送的心跳还没有回复次数大于限定值就断开
@@ -282,7 +283,6 @@ class GatewayWorker extends BaseWorker
     {
         go(function () {
             while (true) {
-                var_dump('维持business心跳');
                 foreach (self::$businesses as $fd) {
                     $this->server->send($fd, new PingMessage());
                 }

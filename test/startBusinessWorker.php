@@ -7,6 +7,7 @@
  * @author   siam
  */
 use Friendsofhyperf\Gateway\BusinessWorker;
+use Friendsofhyperf\Gateway\Test\event\TestEvent;
 
 require __DIR__ . '/../vendor/autoload.php';
 
