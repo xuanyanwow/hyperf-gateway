@@ -124,6 +124,14 @@ class BusinessWorker extends BaseWorker
         }
     }
 
+    /**
+     * 获取所有的gateway地址.
+     */
+    public function getGatewayAddresses()
+    {
+        return $this->gatewayAddresses;
+    }
+
     private function connectGateway($addressList)
     {
         if (empty($addressList)) {
