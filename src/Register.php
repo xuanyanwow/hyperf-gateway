@@ -34,7 +34,8 @@ class Register extends BaseWorker
 
     public function onStart(int $workerId): void
     {
-        echo "\n====================\nregister start \n====================\n\n";
+        
+        self::log("\n====================\nregister start \n====================");
 
         // 读取配置文件，监听端口
     }
@@ -44,7 +45,7 @@ class Register extends BaseWorker
         // 要求10秒内发送验证
         $this->authTimeoutTimerMap[$fd] = Timer::after(1000, function ($fd) {
             $connection = $this->server->getClientInfo($fd);
-            echo 'Register auth timeout (' . $connection['remote_ip'] . '). See http://doc2.workerman.net/register-auth-timeout.html' . PHP_EOL;
+            self::log('Register auth timeout (' . $connection['remote_ip'] . '). See http://doc2.workerman.net/register-auth-timeout.html');
         // $this->server->close($fd);
         }, $fd);
     }
@@ -70,14 +71,14 @@ class Register extends BaseWorker
             case ConnectMessage::CMD:
                 $secretKey = $revData['secretKey'] ?? '';
                 if ($secretKey !== $this->secretKey) {
-                    echo "Register secret_key error IP: {$connection['remote_ip'] } Error Key: {$secretKey} ." . PHP_EOL;
+                    self::log("Register secret_key error IP: {$connection['remote_ip'] } Error Key: {$secretKey} .");
                     $this->server->close($fd);
                     return;
                 }
 
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
                     if (empty($revData['ip'])) {
-                        echo "address not found\n";
+                        self::log("address not found.");
                         $this->server->close($fd);
                         return;
                     }
@@ -97,7 +98,7 @@ class Register extends BaseWorker
             case PingMessage::CMD:
                 return;
             default:
-                echo "Register unknown event:{$revData['cmd']} IP: {$connection['remote_ip'] } ." . PHP_EOL;
+                self::log("Register unknown event:{$revData['cmd']} IP: {$connection['remote_ip'] } .");
                 break;
         }
     }
@@ -107,7 +108,7 @@ class Register extends BaseWorker
         $this->clearTimer($fd);
         // 区分是gateway还是business
         // gateway删除 通知所有business
-        var_dump('register 中有人断开' . $fd);
+        self::debug('register 中有人断开' . $fd)
 
         if (! empty($this->gateways[$fd])) {
             unset($this->gateways[$fd]);
