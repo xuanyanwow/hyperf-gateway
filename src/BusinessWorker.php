@@ -27,6 +27,9 @@ class BusinessWorker extends BaseWorker
     /** 正在尝试连接的 gateway address */
     protected array $gatewayConnecting = [];
 
+    /** register返回的gateway地址数组 用于校验是否需要重连 */
+    protected array $gatewayAddresses = [];
+
     // private static Client $registerClient;
 
     public function __construct(
@@ -79,6 +82,7 @@ class BusinessWorker extends BaseWorker
     {
         $data = json_decode($data, true);
         if ($data['class'] ?? '' == GatewayInfoMessage::CMD) {
+            $this->gatewayAddresses = $data['list'] ?? [];
             $this->connectGateway($data['list'] ?? []);
             return;
         }
@@ -113,7 +117,11 @@ class BusinessWorker extends BaseWorker
         unset(self::$gateways[$address], $this->gatewayConnecting[$address]);
 
         self::debug('business worker onGatewayClose', $address);
-        $client->reconnect(1);
+
+        // 不能直接重连，要判断一下地址是否还有效(register返回)
+        if (isset($this->gatewayAddresses[$address])) {
+            $client->reconnect(1);
+        }
     }
 
     private function connectGateway($addressList)
