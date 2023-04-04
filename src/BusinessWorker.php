@@ -130,6 +130,7 @@ class BusinessWorker extends BaseWorker
 
         // 不能直接重连，要判断一下地址是否还有效(register返回)
         if (isset($this->gatewayAddresses[$address])) {
+            self::debug('business worker onGatewayClose 重连', $address);
             $client->reconnect(1);
         }
     }
