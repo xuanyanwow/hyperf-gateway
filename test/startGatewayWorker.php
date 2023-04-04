@@ -10,7 +10,16 @@ use Friendsofhyperf\Gateway\GatewayWorker;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+// 获取命令行传参
+$options = getopt('', ['listenPort:', 'lanPort:']);
+$listenPort = isset($options['listenPort']) ? (int) $options['listenPort'] : 9501;
+$lanPort = isset($options['lanPort']) ? (int) $options['lanPort'] : 9502;
+
 (new GatewayWorker(
     secretKey: 'friendsofhyperf',
-    workerNumber: 1,
+    listenPort: $listenPort,
+    lanPort: $lanPort,
 ))->start(false);
+
+// php startGatewayWorker.php --listenPort=9501 --lanPort=9502
+// php startGatewayWorker.php --listenPort=9503 --lanPort=9504
