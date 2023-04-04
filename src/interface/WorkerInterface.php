@@ -6,7 +6,7 @@
  * @document https://github.com/xuanyanwow/hyperf-gateway/blob/master/README.md
  * @author   siam
  */
-namespace Friendsofhyperf\Gateway;
+namespace Friendsofhyperf\Gateway\interface;
 
 interface WorkerInterface
 {

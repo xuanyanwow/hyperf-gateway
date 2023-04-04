@@ -8,6 +8,8 @@
  */
 namespace Friendsofhyperf\Gateway;
 
+use Friendsofhyperf\Gateway\interface\WorkerInterface;
+
 abstract class BaseWorker implements WorkerInterface
 {
     public static function log($message)

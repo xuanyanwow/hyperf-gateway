@@ -8,6 +8,7 @@
  */
 namespace Friendsofhyperf\Gateway;
 
+use EventInterface;
 use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
@@ -30,7 +31,8 @@ class BusinessWorker extends BaseWorker
     /** register返回的gateway地址数组 用于校验是否需要重连 */
     protected array $gatewayAddresses = [];
 
-    // private static Client $registerClient;
+    /** 用户定义事件 */
+    protected EventInterface $customerEvent;
 
     public function __construct(
         public int $workerNumber = 1,
@@ -41,6 +43,12 @@ class BusinessWorker extends BaseWorker
         public string $secretKey = '',
         public int $pingRegisterInterval = 3,
     ) {
+    }
+
+    // setter
+    public function setCustomerEvent(EventInterface $event)
+    {
+        $this->customerEvent = $event;
     }
 
     public function onStart(int $workerId): void
@@ -106,19 +114,42 @@ class BusinessWorker extends BaseWorker
     {
         $data = json_decode($data, true);
 
-        $class = $data['class'];
-        switch ($class) {
+        self::debug('business worker onGatewayMessage', $data);
+
+        // TODO 请求上下文
+
+        $cmd = $data['class'];
+        switch ($cmd) {
             case SuccessMessage::CMD:
                 $address = $gateway->getAddressWithPort();
                 self::$gateways[$address] = $gateway;
                 return;
             case PingMessage::CMD:
                 return;
+            case 'onConnect':
+                if (isset($this->customerEvent)) {
+                    $this->customerEvent->onConnect($data['fd']);
+                }
+                break;
+            case 'onWebsocketConnect':
+                if (isset($this->customerEvent)) {
+                    $this->customerEvent->onWebsocketConnect($data['fd'], $data['data']);
+                }
+                break;
+            case 'onMessage':
+                if (isset($this->customerEvent)) {
+                    $this->customerEvent->onMessage($data['fd'], $data['data']);
+                }
+                break;
+            case 'onClose':
+                if (isset($this->customerEvent)) {
+                    $this->customerEvent->onClose($data['fd']);
+                }
+                break;
+            default:
+                echo "Receive bad cmd:{$class} from Gateway.\n";
+                break;
         }
-
-        self::debug('business worker onGatewayMessage', $data);
-
-        // TODO 最复杂的转发逻辑
     }
 
     public function onGatewayClose(TcpClient $gateway)
