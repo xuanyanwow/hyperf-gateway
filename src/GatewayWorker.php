@@ -285,7 +285,7 @@ class GatewayWorker extends BaseWorker
                 foreach (self::$businesses as $fd) {
                     $this->server->send($fd, new PingMessage());
                 }
-                Coroutine::sleep(3);
+                Coroutine::sleep($this->pingInterval);
             }
         });
     }

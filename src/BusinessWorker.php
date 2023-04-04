@@ -40,7 +40,6 @@ class BusinessWorker extends BaseWorker
         public string $registerAddress = '127.0.0.1',
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,
-        public int $pingInterval = 30,
         public string $secretKey = '',
         public int $pingRegisterInterval = 3,
     ) {
