@@ -13,6 +13,7 @@ use Friendsofhyperf\Gateway\message\gateway\RedirectionMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
+use Friendsofhyperf\Gateway\utils\ClientUtil;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
 use Friendsofhyperf\Gateway\worker\TcpConnection;
 use Swoole\Coroutine;
@@ -79,6 +80,7 @@ class GatewayWorker extends BaseWorker
             'client_ip' => ip2long($clientInfo['remote_ip']),
             'client_port' => $clientInfo['remote_port'],
             'connection_id' => $fd,
+            'client_id' => ClientUtil::addressToClientId(ip2long($this->lanIp), $this->lanPort, $fd),
         ];
 
         // 保存客户端连接 connection 对象

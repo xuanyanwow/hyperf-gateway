@@ -126,7 +126,7 @@ class BusinessWorker extends BaseWorker
             gatewayPort: $data['gateway_port'],
             internalPort: $data['internal_port'],
             connectionId: $data['connection_id'],
-            clientId: '',// 生成
+            clientId: $data['client_id'],
         );
 
         $cmd = $data['cmd'];
