@@ -12,5 +12,5 @@ class PongMessage extends BaseMessage
 {
     public const CMD = 'PongMessage';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 }

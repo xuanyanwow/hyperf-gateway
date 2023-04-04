@@ -14,7 +14,7 @@ class BusinessConnectMessage extends BaseMessage
 {
     public const CMD = 'BusinessConnectMessage';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 
     public string $ip;
 

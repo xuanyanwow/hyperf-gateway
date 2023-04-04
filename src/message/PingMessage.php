@@ -12,5 +12,5 @@ class PingMessage extends BaseMessage
 {
     public const CMD = 'PingMessage';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 }

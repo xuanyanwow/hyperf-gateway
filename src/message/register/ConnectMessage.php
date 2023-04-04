@@ -18,7 +18,7 @@ class ConnectMessage extends BaseMessage
 
     public const TYPE_BUSINESS = 'business';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 
     public function __construct(public string $ip, public string $type, public string $secretKey)
     {

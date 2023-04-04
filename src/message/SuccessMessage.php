@@ -12,7 +12,7 @@ class SuccessMessage extends BaseMessage
 {
     public const CMD = 'SuccessMessage';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 
     public string $message;
 

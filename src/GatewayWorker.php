@@ -9,6 +9,7 @@
 namespace Friendsofhyperf\Gateway;
 
 use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
+use Friendsofhyperf\Gateway\message\gateway\RedirectionMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
@@ -72,26 +73,25 @@ class GatewayWorker extends BaseWorker
 
         // 保存该连接的内部通讯的数据包报头，避免每次重新初始化
         $connection->gatewayHeader = [
-            'local_ip' => ip2long($this->lanIp),
-            'local_port' => $this->lanPort,
+            'gateway_ip' => ip2long($this->lanIp),
+            'gateway_port' => $this->listenPort,
+            'internal_port' => $this->lanPort,
             'client_ip' => ip2long($clientInfo['remote_ip']),
             'client_port' => $clientInfo['remote_port'],
-            'gateway_port' => $this->listenPort,
             'connection_id' => $fd,
-            'flag' => 0,
         ];
 
         // 保存客户端连接 connection 对象
         self::$clients[$fd] = $connection;
 
         // 让 business 执行业务层的 onConnect 回调
-        $this->sendToWorker('client connect', $connection);
+        $this->sendToWorker(RedirectionMessage::CMD_CONNECT, $connection);
     }
 
     public function onMessage($fd, $revData)
     {
         $connection = self::$clients[$fd];
-        $this->sendToWorker('client message', $connection, $revData);
+        $this->sendToWorker(RedirectionMessage::CMD_MESSAGE, $connection, $revData);
     }
 
     public function onClose($fd): void
@@ -100,7 +100,7 @@ class GatewayWorker extends BaseWorker
         $connection = self::$clients[$fd];
         $connection->pingNotResponseCount = -1;
         // 尝试通知 worker，触发 Event::onClose
-        $this->sendToWorker('client close', $connection);
+        $this->sendToWorker(RedirectionMessage::CMD_CLOSE, $connection);
     }
 
     public function start($daemon = false)
@@ -156,6 +156,11 @@ class GatewayWorker extends BaseWorker
         ]), ConnectMessage::TYPE_GATEWAY, $this->secretKey));
     }
 
+    public function onRegisterReceive($client, $data)
+    {
+        var_dump($data);
+    }
+
     protected function sendToWorker($cmd, TcpConnection $connection, $body = '')
     {
         if (empty(self::$businesses)) {
@@ -171,7 +176,6 @@ class GatewayWorker extends BaseWorker
             return false;
         }
 
-        // TODO 换成message 类
         $gatewayData = $connection->gatewayHeader;
         $gatewayData['cmd'] = $cmd;
         $gatewayData['body'] = $body;
@@ -222,11 +226,11 @@ class GatewayWorker extends BaseWorker
         // 转发到business
         var_dump($revData);
         $revData = json_decode($revData, true);
-        if (empty($revData) && empty($revData['class'])) {
+        if (empty($revData) && empty($revData['cmd'])) {
             return false;
         }
 
-        switch ($revData['class']) {
+        switch ($revData['cmd']) {
             case BusinessConnectMessage::CMD:
                 self::$businesses[$fd] = $fd;
                 return new SuccessMessage('business connected');
@@ -237,11 +241,6 @@ class GatewayWorker extends BaseWorker
 
     protected function onInternalConnect($server, $fd)
     {
-    }
-
-    public function onRegisterReceive($client, $data)
-    {
-        var_dump($data);
     }
 
     /**

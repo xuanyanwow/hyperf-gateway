@@ -10,11 +10,13 @@ namespace Friendsofhyperf\Gateway;
 
 use EventInterface;
 use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
+use Friendsofhyperf\Gateway\message\gateway\RedirectionMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
 use Friendsofhyperf\Gateway\message\register\ConnectMessage;
 use Friendsofhyperf\Gateway\message\register\GatewayInfoMessage;
 use Friendsofhyperf\Gateway\message\SuccessMessage;
 use Friendsofhyperf\Gateway\worker\ConnectRegisterTrait;
+use Friendsofhyperf\Gateway\worker\Request;
 use Friendsofhyperf\Gateway\worker\TcpClient;
 use Swoole\Coroutine\Client;
 
@@ -90,7 +92,7 @@ class BusinessWorker extends BaseWorker
     {
         $data = json_decode($data, true);
 
-        $cmd = $data['class'] ?? '';
+        $cmd = $data['cmd'] ?? '';
 
         switch ($cmd) {
             case GatewayInfoMessage::CMD:
@@ -116,9 +118,18 @@ class BusinessWorker extends BaseWorker
 
         self::debug('business worker onGatewayMessage', $data);
 
-        // TODO 请求上下文
+        // 请求上下文
+        $request = new Request(
+            clientIp: $data['client_ip'],
+            clientPort: $data['client_port'],
+            gatewayIp: $data['gateway_ip'],
+            gatewayPort: $data['gateway_port'],
+            internalPort: $data['internal_port'],
+            connectionId: $data['connection_id'],
+            clientId: '',// 生成
+        );
 
-        $cmd = $data['class'];
+        $cmd = $data['cmd'];
         switch ($cmd) {
             case SuccessMessage::CMD:
                 $address = $gateway->getAddressWithPort();
@@ -126,28 +137,28 @@ class BusinessWorker extends BaseWorker
                 return;
             case PingMessage::CMD:
                 return;
-            case 'onConnect':
+            case RedirectionMessage::CMD_CONNECT :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onConnect($data['fd']);
+                    $this->customerEvent->onConnect($request);
                 }
                 break;
-            case 'onWebsocketConnect':
+            case RedirectionMessage::CMD_WEBSOCKET_CONNECT :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onWebsocketConnect($data['fd'], $data['data']);
+                    $this->customerEvent->onWebsocketConnect($request, []);
                 }
                 break;
-            case 'onMessage':
+            case RedirectionMessage::CMD_MESSAGE :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onMessage($data['fd'], $data['data']);
+                    $this->customerEvent->onMessage($request, $data['data']);
                 }
                 break;
-            case 'onClose':
+            case RedirectionMessage::CMD_CLOSE :
                 if (isset($this->customerEvent)) {
-                    $this->customerEvent->onClose($data['fd']);
+                    $this->customerEvent->onClose($request);
                 }
                 break;
             default:
-                echo "Receive bad cmd:{$class} from Gateway.\n";
+                echo "Receive bad cmd:{$cmd} from Gateway.\n";
                 break;
         }
     }

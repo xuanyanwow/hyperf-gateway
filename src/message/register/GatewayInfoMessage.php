@@ -14,7 +14,7 @@ class GatewayInfoMessage extends BaseMessage
 {
     public const CMD = 'GatewayInfoMessage';
 
-    public string $class = self::CMD;
+    public string $cmd = self::CMD;
 
     public function __construct(public array $list)
     {

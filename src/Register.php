@@ -58,12 +58,12 @@ class Register extends BaseWorker
 
         $revData = trim($revData);
         $revData = json_decode($revData, true);
-        if (! isset($revData['class'])) {
+        if (! isset($revData['cmd'])) {
             return false;
         }
         var_dump($revData);
 
-        switch ($revData['class']) {
+        switch ($revData['cmd']) {
             // 区分是gateway还是business
             // gateway存起来
             // business直接返回所有gateway信息
@@ -97,7 +97,7 @@ class Register extends BaseWorker
             case PingMessage::CMD:
                 return;
             default:
-                echo "Register unknown event:{$revData['class']} IP: {$connection['remote_ip'] } ." . PHP_EOL;
+                echo "Register unknown event:{$revData['cmd']} IP: {$connection['remote_ip'] } ." . PHP_EOL;
                 break;
         }
     }
