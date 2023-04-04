@@ -12,4 +12,6 @@ require __DIR__ . '/../vendor/autoload.php';
 
 (new BusinessWorker(
     secretKey: 'friendsofhyperf'
-))->start(false);
+))
+    ->setCustomerEvent(new TestEvent())
+    ->start(false);

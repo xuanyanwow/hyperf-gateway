@@ -8,7 +8,7 @@
  */
 namespace Friendsofhyperf\Gateway;
 
-use EventInterface;
+use Friendsofhyperf\Gateway\interface\EventInterface;
 use Friendsofhyperf\Gateway\message\business\BusinessConnectMessage;
 use Friendsofhyperf\Gateway\message\gateway\RedirectionMessage;
 use Friendsofhyperf\Gateway\message\PingMessage;
@@ -47,10 +47,10 @@ class BusinessWorker extends BaseWorker
     ) {
     }
 
-    // setter
     public function setCustomerEvent(EventInterface $event)
     {
         $this->customerEvent = $event;
+        return $this;
     }
 
     public function onStart(int $workerId): void
