@@ -34,10 +34,7 @@ class Register extends BaseWorker
 
     public function onStart(int $workerId): void
     {
-        
         self::log("\n====================\nregister start \n====================");
-
-        // 读取配置文件，监听端口
     }
 
     public function onConnect($fd): void
