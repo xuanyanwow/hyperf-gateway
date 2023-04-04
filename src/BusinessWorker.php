@@ -37,7 +37,6 @@ class BusinessWorker extends BaseWorker
     protected EventInterface $customerEvent;
 
     public function __construct(
-        public int $workerNumber = 1,
         public string $registerAddress = '127.0.0.1',
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,

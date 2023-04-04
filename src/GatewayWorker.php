@@ -37,7 +37,6 @@ class GatewayWorker extends BaseWorker
         public int $listenPort = 9501,
         public string $lanIp = '127.0.0.1',
         public int $lanPort = 9502,
-        public int $workerNumber = 1,
         public string $registerAddress = '127.0.0.1',
         public int $registerPort = 1236,
         public int $registerConnectTimeout = 3,
@@ -118,7 +117,7 @@ class GatewayWorker extends BaseWorker
         $this->startInternalServer();
 
         $server->set([
-            'worker_num' => $this->workerNumber,
+            'worker_num' => 1,
             'daemonize' => $daemon,
             'enable_coroutine' => true,
         ]);

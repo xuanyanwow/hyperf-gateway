@@ -16,6 +16,8 @@ class TestEvent implements EventInterface
     {
         echo 'test event onConnect';
         var_dump($connection);
+        // 打印进程id
+        echo 'process id: ' . getmypid() . PHP_EOL;
     }
 
     public function onMessage($connection, $data)
