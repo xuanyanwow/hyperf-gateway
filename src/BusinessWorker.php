@@ -107,13 +107,13 @@ class BusinessWorker extends BaseWorker
         $data = json_decode($data, true);
 
         $class = $data['class'];
-        if ($class == SuccessMessage::CMD) {
-            $address = $client->getAddressWithPort();
-            self::$gateways[$address] = $client;
-            return;
-        }
-        if ($class == PingMessage::CMD) {
-            return;
+        switch ($class) {
+            case SuccessMessage::CMD:
+                $address = $client->getAddressWithPort();
+                self::$gateways[$address] = $client;
+                return;
+            case PingMessage::CMD:
+                return;
         }
 
         self::debug('business worker onGatewayMessage', $data);
