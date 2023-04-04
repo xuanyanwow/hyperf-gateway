@@ -75,7 +75,7 @@ class Register extends BaseWorker
 
                 if ($revData['type'] === ConnectMessage::TYPE_GATEWAY) {
                     if (empty($revData['ip'])) {
-                        self::log("address not found.");
+                        self::log('address not found.');
                         $this->server->close($fd);
                         return;
                     }
@@ -105,7 +105,7 @@ class Register extends BaseWorker
         $this->clearTimer($fd);
         // 区分是gateway还是business
         // gateway删除 通知所有business
-        self::debug('register 中有人断开' . $fd)
+        self::debug('register 中有人断开' . $fd);
 
         if (! empty($this->gateways[$fd])) {
             unset($this->gateways[$fd]);
